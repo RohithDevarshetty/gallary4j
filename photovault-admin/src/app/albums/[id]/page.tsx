@@ -124,11 +124,11 @@ export default function AlbumDetailPage() {
             </div>
             <div className="flex items-center">
               <label className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer">
-                Upload Photos
+                Upload Photos/Videos
                 <input
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,video/*"
                   onChange={handleFileUpload}
                   className="hidden"
                   disabled={uploading}
@@ -146,7 +146,7 @@ export default function AlbumDetailPage() {
             <p className="text-gray-600 mt-2">{album.description}</p>
           )}
           <div className="mt-2 text-sm text-gray-500">
-            {media.length} photos · {album?.viewCount || 0} views
+            {media.length} items · {album?.viewCount || 0} views
           </div>
         </div>
 
@@ -167,13 +167,13 @@ export default function AlbumDetailPage() {
 
         {media.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
-            <p className="text-gray-500 mb-4">No photos yet</p>
+            <p className="text-gray-500 mb-4">No media yet</p>
             <label className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer">
-              Upload Your First Photo
+              Upload Your First Photo/Video
               <input
                 type="file"
                 multiple
-                accept="image/*"
+                accept="image/*,video/*"
                 onChange={handleFileUpload}
                 className="hidden"
               />

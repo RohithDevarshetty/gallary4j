@@ -7,12 +7,13 @@ A fully functional, production-ready enterprise photo gallery platform built wit
 ### Core Functionality
 - ✅ **Multi-tenant photographer accounts** with JWT authentication
 - ✅ **Album management** with client sharing
-- ✅ **Photo upload** with automatic processing and thumbnail generation
+- ✅ **Photo & Video upload** with automatic processing
 - ✅ **Image optimization** with multiple sizes (thumbnail, preview, optimized)
-- ✅ **Public gallery** for clients to view and download photos
+- ✅ **Video transcoding** with H.264 codec, quality control (CRF), and automatic thumbnail generation
+- ✅ **Public gallery** for clients to view and download media
 - ✅ **Analytics tracking** (views, downloads)
 - ✅ **Distributed caching** with Hazelcast
-- ✅ **Async processing** with RabbitMQ
+- ✅ **Async processing** with Apache Kafka
 - ✅ **RESTful API** with Spring Boot
 - ✅ **Modern UI** with Next.js and Tailwind CSS
 
@@ -20,7 +21,8 @@ A fully functional, production-ready enterprise photo gallery platform built wit
 - Spring Boot 3.2 with Java 21
 - PostgreSQL 16 with optimized schema
 - Hazelcast IMDG for distributed caching
-- RabbitMQ for asynchronous processing
+- Apache Kafka for event-driven asynchronous processing
+- FFmpeg for video transcoding and thumbnail generation
 - Next.js 14 for both admin and client frontends
 - Docker Compose for local development
 - Comprehensive unit tests
@@ -69,7 +71,7 @@ gallary4j/
 ### 1. Start Infrastructure Services
 
 ```bash
-# Start PostgreSQL and RabbitMQ
+# Start PostgreSQL, Kafka, and Zookeeper
 docker-compose up -d
 
 # Verify services are running
@@ -78,8 +80,8 @@ docker-compose ps
 
 This will start:
 - PostgreSQL on `localhost:5432`
-- RabbitMQ on `localhost:5672`
-- RabbitMQ Management UI on `http://localhost:15672` (guest/guest)
+- Apache Kafka on `localhost:9092`
+- Zookeeper on `localhost:2181`
 
 ### 2. Start the Backend API
 
@@ -248,9 +250,10 @@ See `init.sql` for complete schema.
 - **Language**: Java 21
 - **Database**: PostgreSQL 16
 - **Cache**: Hazelcast IMDG
-- **Queue**: RabbitMQ
+- **Message Streaming**: Apache Kafka
 - **Security**: JWT + BCrypt
 - **Storage**: Local filesystem (S3/R2 ready)
+- **Video Processing**: FFmpeg
 
 ### Frontend Stack
 - **Framework**: Next.js 14
@@ -278,10 +281,11 @@ See `init.sql` for complete schema.
 ## 📈 Performance Optimizations
 
 1. **Caching**: Hazelcast distributed cache for albums and media
-2. **Async Processing**: Background image processing with RabbitMQ
-3. **Image Optimization**: Multiple sizes generated automatically
-4. **Database Indexing**: Optimized queries with proper indexes
-5. **Connection Pooling**: HikariCP for database connections
+2. **Async Processing**: Event-driven media processing with Apache Kafka
+3. **Image Optimization**: Multiple sizes generated automatically (300px, 800px, 1920px)
+4. **Video Transcoding**: H.264 encoding with configurable quality (CRF)
+5. **Database Indexing**: Optimized queries with proper indexes
+6. **Connection Pooling**: HikariCP for database connections
 
 ## 🚀 Production Deployment
 
@@ -297,11 +301,8 @@ DB_NAME=photovault
 DB_USERNAME=photovault
 DB_PASSWORD=strong-password
 
-# RabbitMQ
-RABBITMQ_HOST=your-rabbitmq-host
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME=photovault
-RABBITMQ_PASSWORD=strong-password
+# Kafka
+KAFKA_BOOTSTRAP_SERVERS=your-kafka-host:9092
 
 # JWT
 JWT_SECRET=your-strong-secret-key-256-bits
@@ -434,17 +435,24 @@ chmod 755 ./uploads
 df -h
 ```
 
-### Image Processing Not Working
+### Media Processing Not Working
 
-1. Check RabbitMQ is running:
+1. Check Kafka is running:
 ```bash
-docker-compose ps rabbitmq
+docker-compose ps kafka
 ```
 
-2. View RabbitMQ queues:
-   - Open `http://localhost:15672`
-   - Login with guest/guest
-   - Check queue status
+2. View Kafka topics:
+```bash
+docker exec -it photovault-kafka kafka-topics --list --bootstrap-server localhost:9092
+```
+
+3. Monitor Kafka consumer lag:
+```bash
+docker exec -it photovault-kafka kafka-consumer-groups --bootstrap-server localhost:9092 --group photovault-consumer-group --describe
+```
+
+4. Check application logs for processing errors
 
 ## 📦 Technology Versions
 
@@ -454,10 +462,11 @@ docker-compose ps rabbitmq
 | Spring Boot | 3.2.0 |
 | PostgreSQL | 16 |
 | Hazelcast | 5.3.6 |
-| RabbitMQ | 3.12 |
+| Apache Kafka | 7.5.0 |
 | Next.js | 14.0.4 |
 | React | 18.2.0 |
 | Node.js | 18+ |
+| FFmpeg | Latest |
 
 ## 🤝 Contributing
 

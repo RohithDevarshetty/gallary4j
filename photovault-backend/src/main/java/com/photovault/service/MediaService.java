@@ -4,6 +4,7 @@ import com.photovault.dto.MediaDTO;
 import com.photovault.entity.Album;
 import com.photovault.entity.Media;
 import com.photovault.entity.Photographer;
+import com.photovault.messaging.MediaEventProducer;
 import com.photovault.repository.AlbumRepository;
 import com.photovault.repository.MediaRepository;
 import com.photovault.repository.PhotographerRepository;
@@ -29,7 +30,7 @@ public class MediaService {
     private final AlbumRepository albumRepository;
     private final PhotographerRepository photographerRepository;
     private final StorageService storageService;
-    private final ImageProcessingService imageProcessingService;
+    private final MediaEventProducer mediaEventProducer;
 
     @Transactional
     public Media createMedia(UUID albumId, MultipartFile file, String photographerEmail) {
@@ -77,14 +78,26 @@ public class MediaService {
             photographer.setStorageUsedBytes(photographer.getStorageUsedBytes() + file.getSize());
             photographerRepository.save(photographer);
 
-            // Process asynchronously if image
-            if (file.getContentType() != null && file.getContentType().startsWith("image/")) {
-                log.info("Starting async image processing for media: {}", media.getId());
-                imageProcessingService.processImage(media)
-                    .thenAccept(processedMedia -> {
-                        mediaRepository.save(processedMedia);
-                        log.info("Image processing completed and saved: {}", processedMedia.getId());
-                    });
+            // Send processing event to Kafka based on media type
+            String mimeType = file.getContentType();
+            if (mimeType != null) {
+                if (mimeType.startsWith("image/")) {
+                    log.info("Sending image processing event to Kafka for media: {}", media.getId());
+                    mediaEventProducer.sendImageEvent(
+                        media.getId(),
+                        albumId,
+                        mimeType,
+                        originalUrl
+                    );
+                } else if (mimeType.startsWith("video/")) {
+                    log.info("Sending video processing event to Kafka for media: {}", media.getId());
+                    mediaEventProducer.sendVideoEvent(
+                        media.getId(),
+                        albumId,
+                        mimeType,
+                        originalUrl
+                    );
+                }
             }
 
             log.info("Media created: {}", media.getId());

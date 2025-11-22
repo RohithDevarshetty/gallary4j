@@ -33,12 +33,15 @@ spring:
       max-file-size: 5GB
       max-request-size: 5GB
 
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USERNAME:guest}
-    password: ${RABBITMQ_PASSWORD:guest}
-    virtual-host: /
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: photovault-consumer-group
+      auto-offset-reset: earliest
+      enable-auto-commit: true
+    producer:
+      acks: all
+      retries: 3
 
 # Hazelcast Configuration
 hazelcast:
@@ -75,7 +78,8 @@ processing:
     quality: 85
   video:
     thumbnail-at-second: 3
-    max-resolution: 1080p
+    max-resolution: 1080
+    quality: 23  # CRF value for H.264 (0-51, lower = better quality, 23 is default)
 
 # Security
 security:
