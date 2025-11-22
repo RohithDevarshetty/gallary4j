@@ -1,0 +1,116 @@
+spring:
+  application:
+    name: photovault-api
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:photovault}
+    username: ${DB_USERNAME:photovault}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+    show-sql: false
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5GB
+      max-request-size: 5GB
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: /
+
+# Hazelcast Configuration
+hazelcast:
+  cluster-name: photovault-cluster
+  enabled: true
+
+# Storage Configuration
+storage:
+  type: ${STORAGE_TYPE:local} # local, s3, r2
+  r2:
+    endpoint: ${R2_ENDPOINT:}
+    access-key: ${R2_ACCESS_KEY:}
+    secret-key: ${R2_SECRET_KEY:}
+    bucket: ${R2_BUCKET:photovault-media}
+    region: auto
+  cdn:
+    url: ${CDN_URL:http://localhost:8080/media}
+  local:
+    path: ${LOCAL_STORAGE_PATH:./uploads}
+
+# Upload Configuration
+upload:
+  max-file-size: 5368709120 # 5GB
+  allowed-image-types: jpg,jpeg,png,heic,webp
+  allowed-video-types: mp4,mov,avi,mkv
+  chunk-size: 10485760 # 10MB
+
+# Processing Configuration
+processing:
+  image:
+    thumbnail-size: 300
+    preview-size: 800
+    optimized-size: 1920
+    quality: 85
+  video:
+    thumbnail-at-second: 3
+    max-resolution: 1080p
+
+# Security
+security:
+  jwt:
+    secret: ${JWT_SECRET:your-256-bit-secret-key-change-this-in-production}
+    expiration: 86400000 # 24 hours
+    refresh-expiration: 604800000 # 7 days
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
+
+# Actuator endpoints for health checks and metrics
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.photovault: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+    include-binding-errors: always
