@@ -57,6 +57,15 @@ storage:
     secret-key: ${R2_SECRET_KEY:}
     bucket: ${R2_BUCKET:photovault-media}
     region: auto
+  s3:
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
+    bucket: ${S3_BUCKET:photovault-backups}
+    region: ${S3_REGION:us-east-1}
+  backup:
+    enabled: ${BACKUP_ENABLED:true}
+    cron: ${BACKUP_CRON:0 0 2 * * *} # Daily at 2:00 AM
+    retention-days: ${BACKUP_RETENTION_DAYS:30}
   cdn:
     url: ${CDN_URL:http://localhost:8080/media}
   local:

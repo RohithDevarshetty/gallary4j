@@ -181,11 +181,36 @@ spring:
     username: photovault
     password: password
 
-# Storage (local or S3/R2)
+# Storage Configuration
 storage:
-  type: local  # or 's3' for production
+  type: local  # Options: local, r2, s3
+
+  # Local filesystem (development)
   local:
     path: ./uploads
+
+  # Cloudflare R2 (production)
+  r2:
+    endpoint: https://your-account.r2.cloudflarestorage.com
+    access-key: your-r2-access-key
+    secret-key: your-r2-secret-key
+    bucket: photovault-media
+
+  # AWS S3 (for backups)
+  s3:
+    access-key: your-s3-access-key
+    secret-key: your-s3-secret-key
+    bucket: photovault-backups
+    region: us-east-1
+
+  # Daily backup configuration
+  backup:
+    enabled: true
+    cron: "0 0 2 * * *"  # Daily at 2:00 AM
+    retention-days: 30   # Keep backups for 30 days
+
+  cdn:
+    url: https://cdn.yourphoto vault.com
 
 # JWT Security
 security:
@@ -287,6 +312,117 @@ See `init.sql` for complete schema.
 5. **Database Indexing**: Optimized queries with proper indexes
 6. **Connection Pooling**: HikariCP for database connections
 
+## ☁️ Cloud Storage Setup
+
+### Cloudflare R2 Configuration
+
+1. **Create R2 Bucket**
+   ```bash
+   # Login to Cloudflare dashboard
+   # Navigate to R2 Object Storage
+   # Create bucket: photovault-media
+   ```
+
+2. **Generate API Tokens**
+   ```bash
+   # In R2 dashboard, create API token with read/write permissions
+   # Save the Access Key ID and Secret Access Key
+   ```
+
+3. **Configure Application**
+   ```yaml
+   # application.yml
+   storage:
+     type: r2
+     r2:
+       endpoint: https://your-account-id.r2.cloudflarestorage.com
+       access-key: YOUR_R2_ACCESS_KEY
+       secret-key: YOUR_R2_SECRET_KEY
+       bucket: photovault-media
+     cdn:
+       url: https://pub-xxxx.r2.dev  # R2 public URL or custom domain
+   ```
+
+### AWS S3 Backup Configuration
+
+1. **Create S3 Bucket**
+   ```bash
+   aws s3 mb s3://photovault-backups --region us-east-1
+   ```
+
+2. **Create IAM User for Backups**
+   ```bash
+   # Create IAM user with S3 write permissions
+   # Attach policy: AmazonS3FullAccess (or custom policy)
+   # Generate access key and secret key
+   ```
+
+3. **Configure Daily Backups**
+   ```yaml
+   # application.yml
+   storage:
+     s3:
+       access-key: YOUR_S3_ACCESS_KEY
+       secret-key: YOUR_S3_SECRET_KEY
+       bucket: photovault-backups
+       region: us-east-1
+     backup:
+       enabled: true
+       cron: "0 0 2 * * *"  # Daily at 2:00 AM
+       retention-days: 30
+   ```
+
+### Backup Monitoring
+
+**Check backup status:**
+```bash
+# View application logs for backup results
+tail -f photovault-backend/logs/application.log | grep "Backup"
+
+# Expected output:
+# ✅ Backup completed: 1,234 files, 15,678 MB, 45,123 ms
+```
+
+**List backups in S3:**
+```bash
+aws s3 ls s3://photovault-backups/backups/
+
+# Example output:
+# PRE 2024-01-15/
+# PRE 2024-01-16/
+# PRE 2024-01-17/
+```
+
+**Restore from backup:**
+```bash
+# Download specific backup
+aws s3 sync s3://photovault-backups/backups/2024-01-15/ ./restore/
+
+# Or use the S3 console to browse and restore files
+```
+
+### Storage Cost Optimization
+
+**Cloudflare R2 Benefits:**
+- Zero egress fees (free bandwidth)
+- $0.015 per GB/month storage
+- S3-compatible API
+- Automatic global distribution
+
+**Example costs at scale:**
+```
+1 TB storage on R2: $15/month
++ S3 backup (1 TB): $23/month
+= $38/month total
+
+vs. AWS S3 alone:
+1 TB storage: $23/month
++ 5 TB egress: $450/month
+= $473/month total
+
+Savings: $435/month (92% reduction)
+```
+
 ## 🚀 Production Deployment
 
 ### Environment Variables
@@ -307,13 +443,22 @@ KAFKA_BOOTSTRAP_SERVERS=your-kafka-host:9092
 # JWT
 JWT_SECRET=your-strong-secret-key-256-bits
 
-# Storage (for S3/R2)
+# Cloudflare R2 Storage
 STORAGE_TYPE=r2
-R2_ENDPOINT=https://your-account.r2.cloudflarestorage.com
-R2_ACCESS_KEY=your-access-key
-R2_SECRET_KEY=your-secret-key
+R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+R2_ACCESS_KEY=your-r2-access-key
+R2_SECRET_KEY=your-r2-secret-key
 R2_BUCKET=photovault-media
-CDN_URL=https://cdn.yourphoto vault.com
+CDN_URL=https://pub-xxxx.r2.dev
+
+# AWS S3 Backups
+S3_ACCESS_KEY=your-s3-access-key
+S3_SECRET_KEY=your-s3-secret-key
+S3_BUCKET=photovault-backups
+S3_REGION=us-east-1
+BACKUP_ENABLED=true
+BACKUP_CRON=0 0 2 * * *
+BACKUP_RETENTION_DAYS=30
 ```
 
 ### Build for Production
@@ -498,8 +643,12 @@ For issues or questions:
 
 ## 🗺️ Roadmap
 
+Implemented features:
+- [x] Video processing support with H.264 transcoding
+- [x] Cloudflare R2 cloud storage
+- [x] Daily automated S3 backups
+
 Future enhancements (as per CLAUDE.md):
-- [ ] Video processing support
 - [ ] AI-powered face detection
 - [ ] Auto-tagging with AI
 - [ ] iOS app (Swift/SwiftUI)

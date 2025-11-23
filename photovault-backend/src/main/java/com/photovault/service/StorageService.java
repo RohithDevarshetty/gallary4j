@@ -1,5 +1,6 @@
 package com.photovault.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,10 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class StorageService {
+
+    private final R2StorageService r2StorageService;
 
     @Value("${storage.type:local}")
     private String storageType;
@@ -33,9 +37,10 @@ public class StorageService {
 
         if ("local".equals(storageType)) {
             return uploadToLocal(file, key);
+        } else if ("r2".equals(storageType)) {
+            return r2StorageService.uploadFile(file, albumId, prefix);
         } else {
-            // For S3/R2 implementation
-            throw new UnsupportedOperationException("S3/R2 storage not yet implemented");
+            throw new UnsupportedOperationException("Unknown storage type: " + storageType);
         }
     }
 
@@ -45,8 +50,10 @@ public class StorageService {
 
         if ("local".equals(storageType)) {
             return uploadBytesToLocal(bytes, key);
+        } else if ("r2".equals(storageType)) {
+            return r2StorageService.uploadBytes(bytes, albumId, prefix, filename, contentType);
         } else {
-            throw new UnsupportedOperationException("S3/R2 storage not yet implemented");
+            throw new UnsupportedOperationException("Unknown storage type: " + storageType);
         }
     }
 
@@ -86,8 +93,10 @@ public class StorageService {
             String key = url.replace(cdnUrl + "/", "");
             Path filePath = Paths.get(localStoragePath).resolve(key);
             return Files.readAllBytes(filePath);
+        } else if ("r2".equals(storageType)) {
+            return r2StorageService.downloadFile(url);
         } else {
-            throw new UnsupportedOperationException("S3/R2 download not yet implemented");
+            throw new UnsupportedOperationException("Unknown storage type: " + storageType);
         }
     }
 
@@ -97,8 +106,10 @@ public class StorageService {
             Path filePath = Paths.get(localStoragePath).resolve(key);
             Files.deleteIfExists(filePath);
             log.info("File deleted from local storage: {}", filePath);
+        } else if ("r2".equals(storageType)) {
+            r2StorageService.deleteFile(url);
         } else {
-            throw new UnsupportedOperationException("S3/R2 delete not yet implemented");
+            throw new UnsupportedOperationException("Unknown storage type: " + storageType);
         }
     }
 
