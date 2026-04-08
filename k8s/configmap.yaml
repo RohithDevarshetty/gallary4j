@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: photovault-config
+  namespace: photovault
+data:
+  # Database
+  db.host: "postgres.photovault.svc.cluster.local"
+  db.port: "5432"
+  db.name: "photovault"
+
+  # Kafka
+  kafka.bootstrap.servers: "kafka.photovault.svc.cluster.local:9092"
+
+  # Storage
+  storage.type: "r2"
+  r2.bucket: "photovault-media"
+  cdn.url: "https://cdn.photovault.com"
+
+  # S3 Backup
+  s3.bucket: "photovault-backups"
+  s3.region: "us-east-1"
+
+  # Application
+  cors.allowed.origins: "https://photovault.com,https://app.photovault.com"

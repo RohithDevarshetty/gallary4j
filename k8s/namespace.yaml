@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: photovault
+  labels:
+    name: photovault
+    environment: production

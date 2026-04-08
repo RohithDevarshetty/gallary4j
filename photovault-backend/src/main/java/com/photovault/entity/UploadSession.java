@@ -1,5 +1,6 @@
 package com.photovault.entity;
 
+import com.photovault.dto.PresignedUrlDTO;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -28,8 +30,13 @@ public class UploadSession {
     @JoinColumn(name = "photographer_id", nullable = false)
     private Photographer photographer;
 
-    @Column(name = "album_id", nullable = false)
-    private UUID albumId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "album_id", nullable = false)
+    private Album album;
+
+    // For presigned URLs (not persisted to database)
+    @Transient
+    private List<PresignedUrlDTO> presignedUrls;
 
     // Session info
     @Column(name = "total_files", nullable = false)

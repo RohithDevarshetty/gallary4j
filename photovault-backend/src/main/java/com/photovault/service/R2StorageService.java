@@ -8,6 +8,11 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
+
+import java.time.Duration;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -170,20 +175,35 @@ public class R2StorageService {
     }
 
     /**
-     * Generate presigned URL for direct upload (optional advanced feature)
+     * Generate presigned URL for direct upload
      */
-    public String generatePresignedUploadUrl(String albumId, String filename, int expirationMinutes) {
+    public String generatePresignedUploadUrl(String albumId, String filename) {
         if (r2Client == null) {
             throw new IllegalStateException("R2 client not configured");
         }
 
         String key = String.format("%s/originals/%s", albumId, generateUniqueFilename(filename));
 
-        // Note: For presigned URLs, you'd need S3Presigner
-        // This is a simplified version - full implementation would use S3Presigner
-        log.info("Presigned URL requested for key: {}", key);
+        log.info("Generating presigned upload URL for key: {}", key);
 
-        return buildUrl(key);
+        try (S3Presigner presigner = S3Presigner.create()) {
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(r2Bucket)
+                .key(key)
+                .build();
+
+            PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofHours(24))
+                .putObjectRequest(putObjectRequest)
+                .build();
+
+            PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
+
+            return presignedRequest.url().toString();
+        } catch (Exception e) {
+            log.error("Failed to generate presigned URL", e);
+            throw new RuntimeException("Failed to generate presigned URL", e);
+        }
     }
 
     private String buildUrl(String key) {

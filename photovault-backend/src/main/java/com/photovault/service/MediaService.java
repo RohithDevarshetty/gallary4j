@@ -109,6 +109,62 @@ public class MediaService {
         }
     }
 
+    @Transactional
+    public Media createMediaFromUpload(UUID albumId, UUID photographerId, String filename,
+                                      String mimeType, long fileSizeBytes, String originalUrl) {
+        log.info("Creating media from upload for album: {}", albumId);
+
+        Photographer photographer = photographerRepository.findById(photographerId)
+            .orElseThrow(() -> new RuntimeException("Photographer not found"));
+
+        Album album = albumRepository.findById(albumId)
+            .orElseThrow(() -> new RuntimeException("Album not found"));
+
+        if (!album.getPhotographer().getId().equals(photographer.getId())) {
+            throw new RuntimeException("Unauthorized");
+        }
+
+        // Check storage limit
+        Long currentStorage = mediaRepository.getTotalStorageByPhotographer(photographer.getId());
+        if (currentStorage != null && currentStorage + fileSizeBytes > photographer.getStorageLimitBytes()) {
+            throw new RuntimeException("Storage limit exceeded");
+        }
+
+        Media media = Media.builder()
+            .album(album)
+            .photographer(photographer)
+            .filename(filename)
+            .originalFilename(filename)
+            .mimeType(mimeType)
+            .fileSizeBytes(fileSizeBytes)
+            .originalUrl(originalUrl)
+            .processingStatus(Media.ProcessingStatus.PENDING)
+            .sortOrder(album.getMediaCount())
+            .build();
+
+        media = mediaRepository.save(media);
+
+        // Update album and photographer stats
+        album.setMediaCount(album.getMediaCount() + 1);
+        album.setTotalSizeBytes(album.getTotalSizeBytes() + fileSizeBytes);
+        albumRepository.save(album);
+
+        photographer.setStorageUsedBytes(photographer.getStorageUsedBytes() + fileSizeBytes);
+        photographerRepository.save(photographer);
+
+        // Send processing event to Kafka
+        if (mimeType != null) {
+            if (mimeType.startsWith("image/")) {
+                mediaEventProducer.sendImageEvent(media.getId(), albumId, mimeType, originalUrl);
+            } else if (mimeType.startsWith("video/")) {
+                mediaEventProducer.sendVideoEvent(media.getId(), albumId, mimeType, originalUrl);
+            }
+        }
+
+        log.info("Media created from upload: {}", media.getId());
+        return media;
+    }
+
     @Transactional(readOnly = true)
     @Cacheable(value = "media", key = "#mediaId")
     public MediaDTO getMedia(UUID mediaId) {
