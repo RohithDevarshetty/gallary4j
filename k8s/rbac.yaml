@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: photovault-api
+  namespace: photovault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: photovault-api-role
+  namespace: photovault
+rules:
+- apiGroups: [""]
+  resources: ["endpoints", "pods", "services"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: photovault-api-rolebinding
+  namespace: photovault
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: photovault-api-role
+subjects:
+- kind: ServiceAccount
+  name: photovault-api
+  namespace: photovault
