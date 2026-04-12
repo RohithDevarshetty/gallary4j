@@ -4,6 +4,8 @@ import com.photovault.dto.MediaDTO;
 import com.photovault.entity.Album;
 import com.photovault.entity.Media;
 import com.photovault.entity.Photographer;
+import com.photovault.entity.ProcessingJob;
+import com.photovault.entity.UploadSession;
 import com.photovault.messaging.MediaEventProducer;
 import com.photovault.repository.AlbumRepository;
 import com.photovault.repository.MediaRepository;
@@ -31,6 +33,7 @@ public class MediaService {
     private final PhotographerRepository photographerRepository;
     private final StorageService storageService;
     private final MediaEventProducer mediaEventProducer;
+    private final ProcessingJobService processingJobService;
 
     @Transactional
     public Media createMedia(UUID albumId, MultipartFile file, String photographerEmail) {
@@ -86,26 +89,10 @@ public class MediaService {
             photographer.setStorageUsedBytes(photographer.getStorageUsedBytes() + file.getSize());
             photographerRepository.save(photographer);
 
-            // Send processing event to Kafka based on media type
-            String mimeType = file.getContentType();
-            if (mimeType != null) {
-                if (mimeType.startsWith("image/")) {
-                    log.info("Sending image processing event to Kafka for media: {}", media.getId());
-                    mediaEventProducer.sendImageEvent(
-                        media.getId(),
-                        albumId,
-                        mimeType,
-                        originalUrl
-                    );
-                } else if (mimeType.startsWith("video/")) {
-                    log.info("Sending video processing event to Kafka for media: {}", media.getId());
-                    mediaEventProducer.sendVideoEvent(
-                        media.getId(),
-                        albumId,
-                        mimeType,
-                        originalUrl
-                    );
-                }
+            // Create processing job then send to Kafka
+            ProcessingJob job = processingJobService.createJob(media, null);
+            if (job != null) {
+                mediaEventProducer.sendProcessingEvent(media, job.getId(), null);
             }
 
             log.info("Media created: {}", media.getId());
@@ -120,6 +107,13 @@ public class MediaService {
     @Transactional
     public Media createMediaFromUpload(UUID albumId, UUID photographerId, String filename,
                                       String mimeType, long fileSizeBytes, String originalUrl) {
+        return createMediaFromUpload(albumId, photographerId, filename, mimeType, fileSizeBytes, originalUrl, null);
+    }
+
+    @Transactional
+    public Media createMediaFromUpload(UUID albumId, UUID photographerId, String filename,
+                                      String mimeType, long fileSizeBytes, String originalUrl,
+                                      UploadSession session) {
         log.info("Creating media from upload for album: {}", albumId);
 
         Photographer photographer = photographerRepository.findById(photographerId)
@@ -160,13 +154,11 @@ public class MediaService {
         photographer.setStorageUsedBytes(photographer.getStorageUsedBytes() + fileSizeBytes);
         photographerRepository.save(photographer);
 
-        // Send processing event to Kafka
-        if (mimeType != null) {
-            if (mimeType.startsWith("image/")) {
-                mediaEventProducer.sendImageEvent(media.getId(), albumId, mimeType, originalUrl);
-            } else if (mimeType.startsWith("video/")) {
-                mediaEventProducer.sendVideoEvent(media.getId(), albumId, mimeType, originalUrl);
-            }
+        // Create processing job then send to Kafka
+        ProcessingJob job = processingJobService.createJob(media, session);
+        if (job != null) {
+            mediaEventProducer.sendProcessingEvent(media, job.getId(),
+                session != null ? session.getId() : null);
         }
 
         log.info("Media created from upload: {}", media.getId());

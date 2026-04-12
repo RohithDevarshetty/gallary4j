@@ -29,10 +29,11 @@ public class KafkaConfig {
     private String consumerGroupId;
 
     // Topic names
-    public static final String MEDIA_PROCESSING_TOPIC = "media.processing";
+    public static final String MEDIA_PROCESSING_TOPIC     = "media.processing";
     public static final String THUMBNAIL_GENERATION_TOPIC = "thumbnail.generation";
-    public static final String VIDEO_TRANSCODING_TOPIC = "video.transcoding";
-    public static final String ANALYTICS_EVENTS_TOPIC = "analytics.events";
+    public static final String VIDEO_TRANSCODING_TOPIC    = "video.transcoding";
+    public static final String ANALYTICS_EVENTS_TOPIC     = "analytics.events";
+    public static final String MEDIA_PROCESSING_DLQ_TOPIC = "media.processing.dlq";
 
     // Producer Configuration
     @Bean
@@ -110,6 +111,15 @@ public class KafkaConfig {
             .partitions(5)
             .replicas(1)
             .config("retention.ms", "86400000") // 24 hours retention
+            .build();
+    }
+
+    @Bean
+    public NewTopic mediaProcessingDlqTopic() {
+        return TopicBuilder.name(MEDIA_PROCESSING_DLQ_TOPIC)
+            .partitions(1)
+            .replicas(1)
+            .config("retention.ms", "604800000") // 7 days — keep failed events for investigation
             .build();
     }
 }

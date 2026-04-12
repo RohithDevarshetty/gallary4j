@@ -14,6 +14,38 @@ interface Media {
   folderPath: string | null
 }
 
+interface ProcessingJob {
+  id: string
+  mediaId: string
+  filename: string
+  mimeType: string
+  jobType: string
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'RETRYING'
+  attemptCount: number
+  maxAttempts: number
+  queuedAt: string
+  startedAt: string | null
+  completedAt: string | null
+  errorMessage: string | null
+  durationMs: number | null
+}
+
+const JOB_STATUS_COLOR: Record<string, string> = {
+  QUEUED:     'var(--text-dim)',
+  PROCESSING: 'var(--accent)',
+  COMPLETED:  '#6abf7b',
+  FAILED:     '#e05555',
+  RETRYING:   '#e0a455',
+}
+
+const JOB_STATUS_ICON: Record<string, string> = {
+  QUEUED:     '○',
+  PROCESSING: '◌',
+  COMPLETED:  '●',
+  FAILED:     '✕',
+  RETRYING:   '↺',
+}
+
 // Group media by folderPath; null/empty → root ''
 function groupByFolder(items: Media[]): Record<string, Media[]> {
   const groups: Record<string, Media[]> = {}
@@ -45,11 +77,61 @@ export default function AlbumDetailPage() {
   // Delete confirmation
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // Processing job queue
+  const [jobs, setJobs] = useState<ProcessingJob[]>([])
+  const [showJobPanel, setShowJobPanel] = useState(false)
+  const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const retryingJobId = useRef<string | null>(null)
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) { router.push('/'); return }
     Promise.all([fetchAlbum(token), fetchMedia(token)]).finally(() => setLoading(false))
   }, [albumId])
+
+  // Poll jobs while any are active; stop when all terminal
+  const fetchJobs = useCallback(async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    try {
+      const res = await fetch(`http://localhost:8080/api/v1/jobs/albums/${albumId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const data: ProcessingJob[] = await res.json()
+      setJobs(data)
+      // Stop polling when all jobs are in terminal state
+      const active = data.some(j => j.status === 'QUEUED' || j.status === 'PROCESSING' || j.status === 'RETRYING')
+      if (!active && jobPollRef.current) {
+        clearInterval(jobPollRef.current)
+        jobPollRef.current = null
+      }
+    } catch (e) { /* silent */ }
+  }, [albumId])
+
+  const startJobPolling = useCallback(() => {
+    if (jobPollRef.current) return
+    fetchJobs()
+    jobPollRef.current = setInterval(fetchJobs, 3000)
+  }, [fetchJobs])
+
+  useEffect(() => () => {
+    if (jobPollRef.current) clearInterval(jobPollRef.current)
+  }, [])
+
+  const handleRetryJob = async (jobId: string) => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    retryingJobId.current = jobId
+    try {
+      await fetch(`http://localhost:8080/api/v1/jobs/${jobId}/retry`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      startJobPolling()
+    } catch (e) { console.error('Retry failed:', e) }
+    finally { retryingJobId.current = null }
+  }
 
   const fetchAlbum = async (token: string) => {
     try {
@@ -119,6 +201,9 @@ export default function AlbumDetailPage() {
     // reset so same files can be uploaded again with different folder
     e.target.value = ''
     await fetchMedia(token!)
+    // Start polling for processing jobs
+    setShowJobPanel(true)
+    startJobPolling()
   }
 
   const handleDelete = async (mediaId: string) => {
@@ -276,6 +361,29 @@ export default function AlbumDetailPage() {
             ) : (
               <span className="btn-ghost" style={{ opacity: 0.35, cursor: 'not-allowed' }}>No URL</span>
             )}
+            {jobs.length > 0 && (
+              <button
+                className="btn-ghost"
+                style={{ position: 'relative' }}
+                onClick={() => { setShowJobPanel(p => !p); if (!showJobPanel) startJobPolling() }}
+              >
+                Queue
+                {jobs.some(j => j.status === 'QUEUED' || j.status === 'PROCESSING' || j.status === 'RETRYING') && (
+                  <span style={{
+                    position: 'absolute', top: '4px', right: '4px',
+                    width: '6px', height: '6px', borderRadius: '50%',
+                    background: 'var(--accent)',
+                  }} />
+                )}
+                {jobs.some(j => j.status === 'FAILED') && (
+                  <span style={{
+                    position: 'absolute', top: '4px', right: '4px',
+                    width: '6px', height: '6px', borderRadius: '50%',
+                    background: '#e05555',
+                  }} />
+                )}
+              </button>
+            )}
             <button className="btn-accent-outline" onClick={handleUploadClick} disabled={uploading}>
               {uploading ? `${uploadProgress}%` : '+ Upload'}
             </button>
@@ -294,6 +402,141 @@ export default function AlbumDetailPage() {
       )}
 
       <div className="page">
+
+        {/* Processing queue panel */}
+        {showJobPanel && jobs.length > 0 && (() => {
+          const active   = jobs.filter(j => j.status === 'QUEUED' || j.status === 'PROCESSING' || j.status === 'RETRYING')
+          const completed = jobs.filter(j => j.status === 'COMPLETED').length
+          const failed   = jobs.filter(j => j.status === 'FAILED')
+          const total    = jobs.length
+          const pct      = total === 0 ? 0 : Math.round((completed / total) * 100)
+          const allDone  = active.length === 0
+
+          return (
+            <div
+              className="anim-up"
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--border-hi)',
+                borderRadius: 'var(--radius)',
+                padding: '1.25rem 1.5rem',
+                marginBottom: '2rem',
+              }}
+            >
+              {/* Panel header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {!allDone && (
+                    <div style={{
+                      width: '12px', height: '12px',
+                      border: '1.5px solid var(--border-hi)',
+                      borderTopColor: 'var(--accent)',
+                      borderRadius: '50%',
+                      animation: 'spin 0.7s linear infinite',
+                      flexShrink: 0,
+                    }} />
+                  )}
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: '1.05rem', fontWeight: 300 }}>
+                    {allDone ? 'Processing complete' : 'Processing queue'}
+                  </span>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    {completed}/{total} done
+                    {failed.length > 0 && <span style={{ color: '#e05555', marginLeft: '0.5rem' }}>· {failed.length} failed</span>}
+                  </span>
+                </div>
+                <button
+                  className="btn-ghost"
+                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
+                  onClick={() => setShowJobPanel(false)}
+                >
+                  Dismiss
+                </button>
+              </div>
+
+              {/* Progress bar */}
+              <div className="progress-bar" style={{ marginBottom: '1rem' }}>
+                <div
+                  className="progress-fill"
+                  style={{
+                    width: `${pct}%`,
+                    background: allDone && failed.length > 0
+                      ? 'linear-gradient(90deg, #6abf7b, #e0a455)'
+                      : undefined,
+                  }}
+                />
+              </div>
+
+              {/* Per-file rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', maxHeight: '240px', overflowY: 'auto' }}>
+                {jobs.map(job => (
+                  <div
+                    key={job.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      padding: '0.4rem 0.75rem',
+                      background: 'var(--bg)',
+                      borderRadius: '4px',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    {/* Status icon */}
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: JOB_STATUS_COLOR[job.status] || 'var(--text-dim)',
+                        width: '16px', textAlign: 'center', flexShrink: 0,
+                        animation: job.status === 'PROCESSING' ? 'pulse 1.4s ease-in-out infinite' : 'none',
+                      }}
+                    >
+                      {JOB_STATUS_ICON[job.status] || '?'}
+                    </span>
+
+                    {/* Filename */}
+                    <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {job.filename || job.mediaId}
+                    </span>
+
+                    {/* Type badge */}
+                    <span className="badge" style={{ fontSize: '0.6875rem', padding: '0.1rem 0.4rem' }}>
+                      {job.jobType}
+                    </span>
+
+                    {/* Duration */}
+                    {job.durationMs != null && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                        {(job.durationMs / 1000).toFixed(1)}s
+                      </span>
+                    )}
+
+                    {/* Error + retry */}
+                    {job.status === 'FAILED' && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {job.errorMessage && (
+                          <span
+                            title={job.errorMessage}
+                            style={{ color: '#e05555', fontSize: '0.75rem', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            {job.errorMessage}
+                          </span>
+                        )}
+                        {job.attemptCount < job.maxAttempts && (
+                          <button
+                            className="btn-ghost"
+                            style={{ fontSize: '0.6875rem', padding: '0.15rem 0.5rem' }}
+                            onClick={() => handleRetryJob(job.id)}
+                          >
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
+
         {/* Album header */}
         <div className="anim-up" style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>

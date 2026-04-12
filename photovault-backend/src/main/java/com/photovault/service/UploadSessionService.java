@@ -155,14 +155,15 @@ public class UploadSessionService {
                 mimeType
         );
 
-        // Create media record
+        // Create media record (links to session so a ProcessingJob is created)
         mediaService.createMediaFromUpload(
                 session.getAlbum().getId(),
                 session.getPhotographer().getId(),
                 filename,
                 mimeType,
                 fileBytes.length,
-                url
+                url,
+                session
         );
 
         // Cleanup

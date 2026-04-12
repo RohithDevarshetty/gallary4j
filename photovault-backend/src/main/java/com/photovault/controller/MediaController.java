@@ -38,6 +38,7 @@ public class MediaController {
     private final MediaRepository mediaRepository;
     private final AlbumRepository albumRepository;
     private final StorageService storageService;
+    private final com.photovault.repository.ProcessingJobRepository processingJobRepository;
 
     @PostMapping("/upload")
     @PreAuthorize("hasRole('PHOTOGRAPHER')")
@@ -56,11 +57,16 @@ public class MediaController {
         try {
             Media media = mediaService.createMedia(albumId, file, userDetails.getUsername(), folderPath);
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "mediaId", media.getId(),
-                "status", media.getProcessingStatus().name(),
-                "message", "File uploaded successfully"
-            ));
+            // Look up the job that was created for this media (may be null for unsupported types)
+            var job = processingJobRepository.findByMediaId(media.getId()).orElse(null);
+
+            var response = new java.util.HashMap<String, Object>();
+            response.put("mediaId", media.getId());
+            response.put("status", media.getProcessingStatus().name());
+            response.put("message", "File uploaded successfully");
+            if (job != null) response.put("jobId", job.getId());
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
         } catch (Exception e) {
             log.error("Upload failed", e);

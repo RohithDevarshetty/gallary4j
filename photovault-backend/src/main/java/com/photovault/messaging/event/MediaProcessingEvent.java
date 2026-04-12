@@ -14,6 +14,8 @@ import java.util.UUID;
 public class MediaProcessingEvent {
     private UUID mediaId;
     private UUID albumId;
+    private UUID jobId;
+    private UUID sessionId;
     private String mimeType;
     private String originalUrl;
     private ProcessingType type;
