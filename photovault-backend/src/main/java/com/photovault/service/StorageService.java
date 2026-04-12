@@ -1,7 +1,7 @@
 package com.photovault.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,10 +17,10 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class StorageService {
 
-    private final R2StorageService r2StorageService;
+    @Autowired(required = false)
+    private R2StorageService r2StorageService;
 
     @Value("${storage.type:local}")
     private String storageType;

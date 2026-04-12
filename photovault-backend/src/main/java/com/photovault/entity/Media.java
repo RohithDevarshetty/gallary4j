@@ -138,6 +138,9 @@ public class Media {
     private List<String> colorPalette = new ArrayList<>();
 
     // Organization
+    @Column(name = "folder_path", length = 500)
+    private String folderPath;
+
     @Builder.Default
     @Column(name = "sort_order")
     private Integer sortOrder = 0;

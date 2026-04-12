@@ -17,7 +17,7 @@ public class HazelcastConfig {
     private String clusterName;
 
     @Bean
-    public Config hazelcastConfig() {
+    public Config hazelcastCoreConfig() {
         Config config = new Config();
         config.setClusterName(clusterName);
 
@@ -38,7 +38,7 @@ public class HazelcastConfig {
             .setMaxIdleSeconds(1800) // 30 minutes
             .setEvictionConfig(new EvictionConfig()
                 .setEvictionPolicy(EvictionPolicy.LRU)
-                .setMaxSizePolicy(MaxSizeConfig.MaxSizePolicy.USED_HEAP_PERCENTAGE)
+                .setMaxSizePolicy(MaxSizePolicy.USED_HEAP_PERCENTAGE)
                 .setSize(20));
         config.addMapConfig(albumCacheConfig);
 
@@ -47,7 +47,7 @@ public class HazelcastConfig {
             .setMaxIdleSeconds(3600) // 1 hour
             .setEvictionConfig(new EvictionConfig()
                 .setEvictionPolicy(EvictionPolicy.LRU)
-                .setMaxSizePolicy(MaxSizeConfig.MaxSizePolicy.USED_HEAP_PERCENTAGE)
+                .setMaxSizePolicy(MaxSizePolicy.USED_HEAP_PERCENTAGE)
                 .setSize(30));
         config.addMapConfig(mediaCacheConfig);
 
@@ -55,7 +55,7 @@ public class HazelcastConfig {
         processedMediaConfig.setTimeToLiveSeconds(3600)
             .setEvictionConfig(new EvictionConfig()
                 .setEvictionPolicy(EvictionPolicy.LRU)
-                .setMaxSizePolicy(MaxSizeConfig.MaxSizePolicy.ENTRY_COUNT)
+                .setMaxSizePolicy(MaxSizePolicy.ENTRY_COUNT)
                 .setSize(1000));
         config.addMapConfig(processedMediaConfig);
 
@@ -63,8 +63,8 @@ public class HazelcastConfig {
     }
 
     @Bean
-    public HazelcastInstance hazelcastInstance(Config config) {
-        return Hazelcast.newHazelcastInstance(config);
+    public HazelcastInstance hazelcastInstance(Config hazelcastCoreConfig) {
+        return Hazelcast.newHazelcastInstance(hazelcastCoreConfig);
     }
 
     @Bean

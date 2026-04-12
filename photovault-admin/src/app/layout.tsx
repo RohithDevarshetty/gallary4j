@@ -2,18 +2,14 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PhotoVault Admin',
-  description: 'Enterprise Photo Gallery Platform',
+  title: 'PhotoVault — Studio Admin',
+  description: 'Enterprise photo gallery platform for photographers',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.Node
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="grain">{children}</body>
     </html>
   )
 }

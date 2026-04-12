@@ -3,6 +3,7 @@ package com.photovault.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -35,8 +36,8 @@ public class S3BackupService {
     private int retentionDays;
 
     public S3BackupService(
-            @Qualifier("s3Client") S3Client s3Client,
-            @Qualifier("r2Client") S3Client r2Client) {
+            @Nullable @Qualifier("s3Client") S3Client s3Client,
+            @Nullable @Qualifier("r2Client") S3Client r2Client) {
         this.s3Client = s3Client;
         this.r2Client = r2Client;
     }
@@ -51,13 +52,13 @@ public class S3BackupService {
         }
 
         if (s3Client == null) {
-            log.error("S3 client not configured - cannot perform backup");
-            return BackupResult.failed("S3 not configured");
+            log.warn("S3 client not configured - skipping backup");
+            return BackupResult.skipped("S3 not configured");
         }
 
         if (r2Client == null) {
-            log.error("R2 client not configured - cannot perform backup");
-            return BackupResult.failed("R2 not configured");
+            log.warn("R2 client not configured - skipping backup");
+            return BackupResult.skipped("R2 not configured");
         }
 
         String backupDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE);

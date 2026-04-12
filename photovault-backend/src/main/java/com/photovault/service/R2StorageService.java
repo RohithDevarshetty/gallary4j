@@ -3,6 +3,7 @@ package com.photovault.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -22,6 +23,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
+@ConditionalOnProperty(name = "storage.type", havingValue = "r2")
 public class R2StorageService {
 
     private final S3Client r2Client;

@@ -5,11 +5,7 @@ import { useRouter } from 'next/navigation'
 
 export default function RegisterPage() {
   const router = useRouter()
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    studioName: '',
-  })
+  const [formData, setFormData] = useState({ email: '', password: '', studioName: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -17,19 +13,16 @@ export default function RegisterPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-
     try {
       const response = await fetch('http://localhost:8080/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || 'Registration failed')
       }
-
       const data = await response.json()
       localStorage.setItem('token', data.token)
       localStorage.setItem('photographerId', data.photographerId)
@@ -42,81 +35,179 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
+    <div style={{ display: 'flex', minHeight: '100dvh' }}>
+      {/* ── Left panel ── */}
+      <div style={{
+        flex: '0 0 42%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        padding: '3rem',
+        background: '#0d0d0d',
+        borderRight: '1px solid var(--border)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Decorative circles */}
+        <div style={{
+          position: 'absolute',
+          bottom: '-200px',
+          left: '-200px',
+          width: '480px',
+          height: '480px',
+          borderRadius: '50%',
+          border: '1px solid rgba(200,169,106,0.07)',
+          pointerEvents: 'none',
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: '-140px',
+          left: '-140px',
+          width: '320px',
+          height: '320px',
+          borderRadius: '50%',
+          border: '1px solid rgba(200,169,106,0.05)',
+          pointerEvents: 'none',
+        }} />
+
+        <div className="anim-in" style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: '1.4rem',
+          fontStyle: 'italic',
+          fontWeight: 400,
+          color: 'var(--text)',
+        }}>
+          Photo<span style={{ color: 'var(--accent)' }}>Vault</span>
+        </div>
+
         <div>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900">
-            Create Account
+          <h2 className="anim-up" style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 'clamp(2rem, 4vw, 3.25rem)',
+            fontWeight: 300,
+            lineHeight: 1.15,
+            color: 'var(--text)',
+            marginBottom: '1.5rem',
+          }}>
+            Built for<br />
+            <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>serious</em><br />
+            photographers.
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Start your 14-day free trial
+          <p className="anim-up d-1" style={{
+            fontSize: '0.9rem',
+            color: 'var(--text-muted)',
+            lineHeight: 1.7,
+          }}>
+            14-day free trial. No credit card required.
+            Full access to all Studio features from day one.
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              {error}
+
+        {/* Plan features */}
+        <div className="anim-up d-2" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {[
+            'Unlimited photo galleries',
+            'Client delivery & favorites',
+            'Custom branding & domain',
+            'Analytics & download tracking',
+          ].map((feat) => (
+            <div key={feat} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: 'var(--accent)',
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{feat}</span>
             </div>
-          )}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="studioName" className="block text-sm font-medium text-gray-700">
-                Studio Name
-              </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right panel ── */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        padding: '3rem 4rem',
+        background: 'var(--surface)',
+      }}>
+        <div style={{ maxWidth: '380px', width: '100%' }}>
+          <div className="anim-up">
+            <h2 style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: '2.25rem',
+              fontWeight: 400,
+              color: 'var(--text)',
+              marginBottom: '0.5rem',
+            }}>
+              Create account
+            </h2>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '2.5rem' }}>
+              Start your 14-day free trial today.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+            {error && (
+              <div className="alert-error anim-in">{error}</div>
+            )}
+
+            <div className="field anim-up d-1">
+              <label htmlFor="studioName">Studio name</label>
               <input
                 id="studioName"
-                name="studioName"
                 type="text"
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Aperture Studio"
                 value={formData.studioName}
                 onChange={(e) => setFormData({ ...formData, studioName: e.target.value })}
               />
             </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
+
+            <div className="field anim-up d-2">
+              <label htmlFor="email">Email address</label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 required
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="you@studio.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
             </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+
+            <div className="field anim-up d-3">
+              <label htmlFor="password">Password</label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 required
                 minLength={6}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="min. 6 characters"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
             </div>
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-          >
-            {loading ? 'Creating account...' : 'Create Account'}
-          </button>
-          <p className="text-center text-sm text-gray-600">
-            Already have an account?{' '}
-            <a href="/" className="font-medium text-blue-600 hover:text-blue-500">
-              Sign in
-            </a>
-          </p>
-        </form>
+
+            <div className="anim-up d-4" style={{ marginTop: '0.5rem' }}>
+              <button type="submit" className="btn-primary" disabled={loading}>
+                {loading ? <><span className="spinner" /> Creating account…</> : 'Create Account'}
+              </button>
+            </div>
+
+            <p className="anim-up d-5" style={{
+              textAlign: 'center',
+              fontSize: '0.875rem',
+              color: 'var(--text-muted)',
+            }}>
+              Already have an account?{' '}
+              <a href="/" style={{ color: 'var(--accent)', fontWeight: 500 }}>Sign in</a>
+            </p>
+          </form>
+        </div>
       </div>
     </div>
   )

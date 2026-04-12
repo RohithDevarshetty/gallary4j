@@ -18,6 +18,6 @@ public interface UploadSessionRepository extends JpaRepository<UploadSession, UU
     @Query("SELECT s FROM UploadSession s WHERE s.photographer.id = :photographerId ORDER BY s.createdAt DESC")
     List<UploadSession> findByPhotographerId(UUID photographerId);
 
-    @Query("SELECT s FROM UploadSession s WHERE s.albumId = :albumId ORDER BY s.createdAt DESC")
+    @Query("SELECT s FROM UploadSession s WHERE s.album.id = :albumId ORDER BY s.createdAt DESC")
     List<UploadSession> findByAlbumId(UUID albumId);
 }

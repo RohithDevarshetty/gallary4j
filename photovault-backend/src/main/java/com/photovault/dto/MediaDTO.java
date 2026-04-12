@@ -39,6 +39,7 @@ public class MediaDTO {
     private Instant takenAt;
     private List<String> tagsAuto;
     private List<String> colorPalette;
+    private String folderPath;
     private Integer sortOrder;
     private Boolean isCover;
     private Integer viewCount;

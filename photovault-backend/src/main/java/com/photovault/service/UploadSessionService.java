@@ -10,7 +10,9 @@ import com.photovault.repository.AlbumRepository;
 import com.photovault.repository.PhotographerRepository;
 import com.photovault.repository.UploadSessionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,8 +37,10 @@ public class UploadSessionService {
     private final PhotographerRepository photographerRepository;
     private final AlbumRepository albumRepository;
     private final StorageService storageService;
-    private final R2StorageService r2StorageService;
     private final MediaService mediaService;
+
+    @Autowired(required = false)
+    private R2StorageService r2StorageService;
 
     @Value("${storage.type:local}")
     private String storageType;
@@ -64,7 +68,7 @@ public class UploadSessionService {
                 .uploadedFiles(0)
                 .totalBytes(totalBytes)
                 .uploadedBytes(0L)
-                .status("active")
+                .status(UploadSession.Status.ACTIVE)
                 .clientType(clientType)
                 .clientVersion(clientVersion)
                 .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
@@ -243,7 +247,7 @@ public class UploadSessionService {
                 .uploadedFiles(session.getUploadedFiles())
                 .totalBytes(session.getTotalBytes())
                 .uploadedBytes(session.getUploadedBytes())
-                .status(session.getStatus())
+                .status(session.getStatus() != null ? session.getStatus().name() : null)
                 .expiresAt(session.getExpiresAt())
                 .completedAt(session.getCompletedAt())
                 .presignedUrls(session.getPresignedUrls())

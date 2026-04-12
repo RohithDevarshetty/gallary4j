@@ -1,8 +1,10 @@
 package com.photovault.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.Nullable;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -32,12 +34,13 @@ public class StorageConfig {
     private String s3SecretKey;
 
     /**
-     * R2 S3 Client (Cloudflare R2)
+     * R2 S3 Client (Cloudflare R2) - optional, only created if configured
      */
     @Bean(name = "r2Client")
+    @Nullable
     public S3Client r2Client() {
-        if (r2Endpoint == null || r2Endpoint.isEmpty()) {
-            return null; // R2 not configured
+        if (r2Endpoint == null || r2Endpoint.trim().isEmpty()) {
+            return null; // R2 not configured, return null
         }
 
         AwsBasicCredentials credentials = AwsBasicCredentials.create(r2AccessKey, r2SecretKey);
@@ -50,12 +53,13 @@ public class StorageConfig {
     }
 
     /**
-     * S3 Client (AWS S3 for backups)
+     * S3 Client (AWS S3 for backups) - optional, only created if configured
      */
     @Bean(name = "s3Client")
+    @Nullable
     public S3Client s3Client() {
-        if (s3AccessKey == null || s3AccessKey.isEmpty()) {
-            return null; // S3 not configured
+        if (s3AccessKey == null || s3AccessKey.trim().isEmpty()) {
+            return null; // S3 not configured, return null
         }
 
         AwsBasicCredentials credentials = AwsBasicCredentials.create(s3AccessKey, s3SecretKey);

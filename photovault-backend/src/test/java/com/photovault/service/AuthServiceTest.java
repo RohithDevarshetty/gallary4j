@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,30 +21,19 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock
-    private PhotographerRepository photographerRepository;
+    @Mock private PhotographerRepository photographerRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtUtil jwtUtil;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private Authentication authentication;
 
-    @Mock
-    private PasswordEncoder passwordEncoder;
-
-    @Mock
-    private JwtUtil jwtUtil;
-
-    @Mock
-    private AuthenticationManager authenticationManager;
-
-    @Mock
-    private Authentication authentication;
-
-    @InjectMocks
-    private AuthService authService;
+    @InjectMocks private AuthService authService;
 
     private Photographer photographer;
     private LoginRequest loginRequest;
@@ -56,6 +46,10 @@ class AuthServiceTest {
             .studioName("Test Studio")
             .passwordHash("hashedpassword")
             .plan("trial")
+            .albumsCount(0)
+            .albumsLimit(10)
+            .storageUsedBytes(0L)
+            .storageLimitBytes(10737418240L)
             .build();
 
         loginRequest = LoginRequest.builder()
@@ -64,50 +58,69 @@ class AuthServiceTest {
             .build();
     }
 
+    // ── Login ────────────────────────────────────────────────────────────────
+
     @Test
-    void login_Success() {
-        // Arrange
+    void login_validCredentials_returnsTokens() {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
             .thenReturn(authentication);
         when(photographerRepository.findActiveByEmail(loginRequest.getEmail()))
             .thenReturn(Optional.of(photographer));
         when(jwtUtil.generateToken(anyString(), any()))
-            .thenReturn("access-token")
-            .thenReturn("refresh-token");
+            .thenReturn("access-token", "refresh-token");
 
-        // Act
         AuthResponse response = authService.login(loginRequest);
 
-        // Assert
         assertNotNull(response);
         assertEquals("access-token", response.getToken());
         assertEquals("refresh-token", response.getRefreshToken());
+        assertEquals("Bearer", response.getTokenType());
         assertEquals(photographer.getId(), response.getPhotographerId());
         assertEquals(photographer.getEmail(), response.getEmail());
-        verify(photographerRepository).save(any(Photographer.class));
+        assertEquals(photographer.getStudioName(), response.getStudioName());
     }
 
     @Test
-    void register_Success() {
-        // Arrange
-        when(photographerRepository.existsByEmail(anyString()))
-            .thenReturn(false);
-        when(passwordEncoder.encode(anyString()))
-            .thenReturn("hashedpassword");
-        when(photographerRepository.save(any(Photographer.class)))
-            .thenReturn(photographer);
+    void login_validCredentials_updatesLastLoginAt() {
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(photographerRepository.findActiveByEmail(any())).thenReturn(Optional.of(photographer));
+        when(jwtUtil.generateToken(anyString(), any())).thenReturn("token");
+
+        authService.login(loginRequest);
+
+        verify(photographerRepository).save(argThat(p -> p.getLastLoginAt() != null));
+    }
+
+    @Test
+    void login_badCredentials_propagatesException() {
+        when(authenticationManager.authenticate(any()))
+            .thenThrow(new BadCredentialsException("Bad credentials"));
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(loginRequest));
+        verify(photographerRepository, never()).save(any());
+    }
+
+    @Test
+    void login_photographerNotFound_throwsException() {
+        when(authenticationManager.authenticate(any())).thenReturn(authentication);
+        when(photographerRepository.findActiveByEmail(any())).thenReturn(Optional.empty());
+
+        assertThrows(RuntimeException.class, () -> authService.login(loginRequest));
+        verify(photographerRepository, never()).save(any());
+    }
+
+    // ── Register ─────────────────────────────────────────────────────────────
+
+    @Test
+    void register_newEmail_createsPhotographerAndReturnsTokens() {
+        when(photographerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashedpassword");
+        when(photographerRepository.save(any(Photographer.class))).thenReturn(photographer);
         when(jwtUtil.generateToken(anyString(), any()))
-            .thenReturn("access-token")
-            .thenReturn("refresh-token");
+            .thenReturn("access-token", "refresh-token");
 
-        // Act
-        AuthResponse response = authService.register(
-            "test@example.com",
-            "password123",
-            "Test Studio"
-        );
+        AuthResponse response = authService.register("test@example.com", "password123", "Test Studio");
 
-        // Assert
         assertNotNull(response);
         assertEquals("access-token", response.getToken());
         assertEquals("refresh-token", response.getRefreshToken());
@@ -115,15 +128,65 @@ class AuthServiceTest {
     }
 
     @Test
-    void register_EmailExists_ThrowsException() {
-        // Arrange
-        when(photographerRepository.existsByEmail(anyString()))
-            .thenReturn(true);
+    void register_newPhotographer_setsTrialPlan() {
+        when(photographerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(photographerRepository.save(any(Photographer.class))).thenAnswer(inv -> {
+            Photographer p = inv.getArgument(0);
+            p.setId(UUID.randomUUID());
+            return p;
+        });
+        when(jwtUtil.generateToken(anyString(), any())).thenReturn("token");
 
-        // Act & Assert
-        assertThrows(RuntimeException.class, () ->
+        authService.register("new@example.com", "pass", "Studio");
+
+        verify(photographerRepository).save(argThat(p ->
+            "trial".equals(p.getPlan()) &&
+            p.getPlanExpiresAt() != null &&
+            p.getStorageLimitBytes() == 10737418240L &&
+            p.getAlbumsLimit() == 10
+        ));
+    }
+
+    @Test
+    void register_newPhotographer_encodesPassword() {
+        when(photographerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode("rawpassword")).thenReturn("encoded-hash");
+        when(photographerRepository.save(any())).thenAnswer(inv -> {
+            Photographer p = inv.getArgument(0);
+            p.setId(UUID.randomUUID());
+            return p;
+        });
+        when(jwtUtil.generateToken(anyString(), any())).thenReturn("token");
+
+        authService.register("test@example.com", "rawpassword", "Studio");
+
+        verify(photographerRepository).save(argThat(p -> "encoded-hash".equals(p.getPasswordHash())));
+    }
+
+    @Test
+    void register_duplicateEmail_throwsExceptionWithoutSaving() {
+        when(photographerRepository.existsByEmail("test@example.com")).thenReturn(true);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
             authService.register("test@example.com", "password", "Studio")
         );
-        verify(photographerRepository, never()).save(any(Photographer.class));
+        assertTrue(ex.getMessage().contains("Email already exists"));
+        verify(photographerRepository, never()).save(any());
+    }
+
+    @Test
+    void register_success_tokenContainsPhotographerId() {
+        when(photographerRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        when(photographerRepository.save(any(Photographer.class))).thenReturn(photographer);
+        when(jwtUtil.generateToken(anyString(), any())).thenReturn("token");
+
+        AuthResponse response = authService.register("test@example.com", "pass", "Studio");
+
+        // Verify token generation was called with photographerId claim
+        verify(jwtUtil).generateToken(eq("test@example.com"), argThat(claims ->
+            claims.containsKey("photographerId") && claims.containsKey("plan")
+        ));
     }
 }

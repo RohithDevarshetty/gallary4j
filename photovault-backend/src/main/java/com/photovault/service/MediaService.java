@@ -34,6 +34,11 @@ public class MediaService {
 
     @Transactional
     public Media createMedia(UUID albumId, MultipartFile file, String photographerEmail) {
+        return createMedia(albumId, file, photographerEmail, null);
+    }
+
+    @Transactional
+    public Media createMedia(UUID albumId, MultipartFile file, String photographerEmail, String folderPath) {
         log.info("Creating media for album: {}", albumId);
 
         Photographer photographer = photographerRepository.findActiveByEmail(photographerEmail)
@@ -56,6 +61,8 @@ public class MediaService {
             // Upload original file
             String originalUrl = storageService.uploadFile(file, albumId.toString(), "originals");
 
+            String normalizedFolder = (folderPath != null && !folderPath.isBlank()) ? folderPath.trim() : null;
+
             Media media = Media.builder()
                 .album(album)
                 .photographer(photographer)
@@ -66,6 +73,7 @@ public class MediaService {
                 .originalUrl(originalUrl)
                 .processingStatus(Media.ProcessingStatus.PENDING)
                 .sortOrder(album.getMediaCount())
+                .folderPath(normalizedFolder)
                 .build();
 
             media = mediaRepository.save(media);
@@ -250,6 +258,7 @@ public class MediaService {
             .takenAt(media.getTakenAt())
             .tagsAuto(media.getTagsAuto())
             .colorPalette(media.getColorPalette())
+            .folderPath(media.getFolderPath())
             .sortOrder(media.getSortOrder())
             .isCover(media.getIsCover())
             .viewCount(media.getViewCount())

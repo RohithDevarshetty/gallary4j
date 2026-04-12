@@ -45,6 +45,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/**").permitAll()
                 .requestMatchers("/api/v1/gallery/**").permitAll()
+                // Public read-only access for client gallery
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/albums/slug/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/media/album/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/media/*/download").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/media/album/*/zip").permitAll()
+                .requestMatchers("/media/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .anyRequest().authenticated()
