@@ -74,8 +74,10 @@ public class AlbumController {
 
     @DeleteMapping("/{albumId}")
     @PreAuthorize("hasRole('PHOTOGRAPHER')")
-    public ResponseEntity<Void> deleteAlbum(@PathVariable UUID albumId) {
-        albumService.deleteAlbum(albumId);
+    public ResponseEntity<Void> deleteAlbum(
+            @PathVariable UUID albumId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        albumService.deleteAlbum(albumId, userDetails.getUsername());
         return ResponseEntity.noContent().build();
     }
 }

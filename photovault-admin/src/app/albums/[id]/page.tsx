@@ -74,7 +74,7 @@ export default function AlbumDetailPage() {
   const [showFolderModal, setShowFolderModal] = useState(false)
   const [pendingFolder, setPendingFolder] = useState('')
 
-  // Delete confirmation
+  // Delete confirmation (unused — keeping for potential future modal; delete is confirmed via window.confirm)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   // Processing job queue
@@ -83,13 +83,20 @@ export default function AlbumDetailPage() {
   const jobPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const retryingJobId = useRef<string | null>(null)
 
+  // Multi-select delete
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (!token) { router.push('/'); return }
     Promise.all([fetchAlbum(token), fetchMedia(token)]).finally(() => setLoading(false))
   }, [albumId])
 
-  // Poll jobs while any are active; stop when all terminal
+  // Poll jobs while any are active; stop when all terminal.
+  // Re-fetches media on every tick so the grid reflects thumbnails as they generate,
+  // and does a final refresh when everything is done.
   const fetchJobs = useCallback(async () => {
     const token = localStorage.getItem('token')
     if (!token) return
@@ -100,8 +107,12 @@ export default function AlbumDetailPage() {
       if (!res.ok) return
       const data: ProcessingJob[] = await res.json()
       setJobs(data)
-      // Stop polling when all jobs are in terminal state
+
       const active = data.some(j => j.status === 'QUEUED' || j.status === 'PROCESSING' || j.status === 'RETRYING')
+
+      // Refresh the media grid so thumbnails appear as each job completes
+      await fetchMedia(token)
+
       if (!active && jobPollRef.current) {
         clearInterval(jobPollRef.current)
         jobPollRef.current = null
@@ -207,6 +218,7 @@ export default function AlbumDetailPage() {
   }
 
   const handleDelete = async (mediaId: string) => {
+    if (!window.confirm('Remove this photo? This cannot be undone.')) return
     const token = localStorage.getItem('token')
     try {
       const res = await fetch(`http://localhost:8080/api/v1/media/${mediaId}`, {
@@ -215,9 +227,42 @@ export default function AlbumDetailPage() {
       })
       if (res.ok) {
         setMedia(prev => prev.filter(m => m.id !== mediaId))
+        fetchAlbum(token!)
       }
     } catch (e) { console.error('Delete error:', e) }
-    finally { setDeletingId(null) }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    if (selected.size === 0) return
+    const token = localStorage.getItem('token')
+    setBulkDeleting(true)
+    try {
+      const res = await fetch('http://localhost:8080/api/v1/media/batch', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify([...selected]),
+      })
+      if (res.ok) {
+        setMedia(prev => prev.filter(m => !selected.has(m.id)))
+        setSelected(new Set())
+        setSelectMode(false)
+        fetchAlbum(token!)
+      }
+    } catch (e) { console.error('Bulk delete error:', e) }
+    finally { setBulkDeleting(false) }
+  }
+
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelected(new Set())
   }
 
   if (loading) {
@@ -296,53 +341,6 @@ export default function AlbumDetailPage() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
-      {deletingId && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(0,0,0,0.75)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onClick={() => setDeletingId(null)}
-        >
-          <div
-            style={{
-              background: 'var(--card)',
-              border: '1px solid var(--border-hi)',
-              borderRadius: 'var(--radius)',
-              padding: '2rem',
-              width: '360px',
-              maxWidth: '90vw',
-              textAlign: 'center',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ fontFamily: 'var(--font-serif)', fontSize: '2.5rem', color: 'var(--text-dim)', marginBottom: '0.75rem' }}>✦</div>
-            <p style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', fontWeight: 300, marginBottom: '0.5rem' }}>
-              Remove this photo?
-            </p>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-              This cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
-              <button className="btn-ghost" onClick={() => setDeletingId(null)}>Keep it</button>
-              <button
-                style={{
-                  padding: '0.5rem 1.25rem', borderRadius: 'var(--radius)',
-                  background: 'rgba(220,60,60,0.12)', border: '1px solid rgba(220,60,60,0.3)',
-                  color: '#e05555', fontSize: '0.8125rem', fontWeight: 500, cursor: 'pointer',
-                  transition: 'background 0.15s',
-                }}
-                onClick={() => handleDelete(deletingId)}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Nav */}
       <nav className="nav">
         <div className="nav-inner">
@@ -384,7 +382,16 @@ export default function AlbumDetailPage() {
                 )}
               </button>
             )}
-            <button className="btn-accent-outline" onClick={handleUploadClick} disabled={uploading}>
+            {media.length > 0 && (
+              <button
+                className="btn-ghost"
+                onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+                style={selectMode ? { color: 'var(--accent)', borderColor: 'var(--accent-dim)' } : {}}
+              >
+                {selectMode ? `Cancel${selected.size > 0 ? ` (${selected.size})` : ''}` : 'Select'}
+              </button>
+            )}
+            <button className="btn-accent-outline" onClick={handleUploadClick} disabled={uploading || selectMode}>
               {uploading ? `${uploadProgress}%` : '+ Upload'}
             </button>
             <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileUpload} style={{ display: 'none' }} />
@@ -634,74 +641,146 @@ export default function AlbumDetailPage() {
 
                 {/* Grid */}
                 <div className="media-grid">
-                  {groups[folderKey].map(item => (
-                    <div
-                      key={item.id}
-                      className="media-thumb"
-                      style={{ position: 'relative' }}
-                    >
-                      {item.thumbnailUrl ? (
-                        <Image
-                          src={item.thumbnailUrl}
-                          alt={item.filename}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 20vw"
-                          style={{ objectFit: 'cover' }}
-                        />
-                      ) : (
-                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                          <div style={{
-                            width: '20px', height: '20px',
-                            border: '1px solid var(--border-hi)',
-                            borderTopColor: item.processingStatus === 'PROCESSING' ? 'var(--accent)' : 'var(--border-hi)',
-                            borderRadius: '50%',
-                            animation: item.processingStatus === 'PROCESSING' ? 'spin 0.7s linear infinite' : 'none',
-                          }} />
-                          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                            {item.processingStatus === 'PROCESSING' ? 'Processing' : 'Pending'}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Delete overlay */}
+                  {groups[folderKey].map(item => {
+                    const isSelected = selected.has(item.id)
+                    return (
                       <div
-                        className="delete-overlay"
+                        key={item.id}
+                        className="media-thumb"
                         style={{
-                          position: 'absolute', inset: 0,
-                          background: 'rgba(0,0,0,0)',
-                          transition: 'background 0.2s',
-                          display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end',
-                          padding: '6px',
+                          position: 'relative',
+                          outline: isSelected ? '2px solid var(--accent)' : 'none',
+                          outlineOffset: '-2px',
                         }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.35)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0)')}
+                        onClick={selectMode ? () => toggleSelect(item.id) : undefined}
                       >
-                        <button
-                          onClick={e => { e.stopPropagation(); setDeletingId(item.id) }}
-                          title="Remove photo"
-                          style={{
-                            width: '24px', height: '24px',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            background: 'rgba(0,0,0,0.6)',
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            borderRadius: '4px',
-                            color: 'rgba(255,255,255,0.7)',
-                            fontSize: '0.7rem', cursor: 'pointer',
-                            opacity: 0, transition: 'opacity 0.15s',
-                          }}
-                          className="delete-btn"
-                        >
-                          ✕
-                        </button>
+                        {item.thumbnailUrl ? (
+                          <Image
+                            src={item.thumbnailUrl}
+                            alt={item.filename}
+                            fill
+                            sizes="(max-width: 768px) 50vw, 20vw"
+                            style={{ objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              width: '20px', height: '20px',
+                              border: '1px solid var(--border-hi)',
+                              borderTopColor: item.processingStatus === 'PROCESSING' ? 'var(--accent)' : 'var(--border-hi)',
+                              borderRadius: '50%',
+                              animation: item.processingStatus === 'PROCESSING' ? 'spin 0.7s linear infinite' : 'none',
+                            }} />
+                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                              {item.processingStatus === 'PROCESSING' ? 'Processing' : 'Pending'}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Select mode checkbox */}
+                        {selectMode && (
+                          <div style={{
+                            position: 'absolute', inset: 0,
+                            background: isSelected ? 'rgba(200,169,106,0.18)' : 'rgba(0,0,0,0.25)',
+                            display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start',
+                            padding: '8px',
+                            cursor: 'pointer',
+                          }}>
+                            <div style={{
+                              width: '20px', height: '20px',
+                              borderRadius: '4px',
+                              border: isSelected ? '2px solid var(--accent)' : '2px solid rgba(255,255,255,0.6)',
+                              background: isSelected ? 'var(--accent)' : 'rgba(0,0,0,0.4)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              flexShrink: 0,
+                              transition: 'all 0.15s',
+                            }}>
+                              {isSelected && <span style={{ color: '#000', fontSize: '0.65rem', fontWeight: 700, lineHeight: 1 }}>✓</span>}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Hover delete (only shown outside select mode) */}
+                        {!selectMode && (
+                          <div
+                            className="delete-overlay"
+                            style={{
+                              position: 'absolute', inset: 0,
+                              background: 'rgba(0,0,0,0)',
+                              transition: 'background 0.2s',
+                              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                              padding: '8px',
+                            }}
+                          >
+                            <button
+                              onClick={e => { e.stopPropagation(); handleDelete(item.id) }}
+                              title="Delete photo"
+                              className="delete-btn"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                padding: '0.3rem 0.75rem',
+                                background: 'rgba(180,40,40,0.85)',
+                                border: '1px solid rgba(255,80,80,0.4)',
+                                borderRadius: '4px',
+                                color: '#fff',
+                                fontSize: '0.7rem', fontWeight: 500,
+                                cursor: 'pointer',
+                                opacity: 0, transition: 'opacity 0.15s',
+                                backdropFilter: 'blur(4px)',
+                                letterSpacing: '0.04em',
+                              }}
+                            >
+                              ✕ Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}
           </>
         )}
       </div>
+
+      {/* Bulk delete action bar */}
+      {selectMode && selected.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 99,
+          background: 'var(--card)',
+          borderTop: '1px solid var(--border-hi)',
+          padding: '1rem 2rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            {selected.size} {selected.size === 1 ? 'photo' : 'photos'} selected
+          </span>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button className="btn-ghost" onClick={exitSelectMode}>
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              style={{
+                padding: '0.5rem 1.25rem',
+                borderRadius: 'var(--radius)',
+                background: bulkDeleting ? 'rgba(220,60,60,0.07)' : 'rgba(220,60,60,0.12)',
+                border: '1px solid rgba(220,60,60,0.3)',
+                color: '#e05555',
+                fontSize: '0.8125rem', fontWeight: 500,
+                cursor: bulkDeleting ? 'not-allowed' : 'pointer',
+                opacity: bulkDeleting ? 0.6 : 1,
+                transition: 'all 0.15s',
+              }}
+            >
+              {bulkDeleting ? 'Deleting…' : `Delete ${selected.size} ${selected.size === 1 ? 'photo' : 'photos'}`}
+            </button>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .media-thumb:hover .delete-btn { opacity: 1 !important; }

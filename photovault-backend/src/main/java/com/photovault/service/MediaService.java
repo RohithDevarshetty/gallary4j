@@ -15,12 +15,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -180,25 +185,67 @@ public class MediaService {
     }
 
     @Transactional
-    public void deleteMedia(UUID mediaId) {
+    public void deleteMedia(UUID mediaId, String ownerEmail) {
         Media media = mediaRepository.findById(mediaId)
             .orElseThrow(() -> new RuntimeException("Media not found"));
+
+        if (!media.getPhotographer().getEmail().equals(ownerEmail)) {
+            throw new AccessDeniedException("You do not own this media");
+        }
 
         media.setDeletedAt(Instant.now());
         mediaRepository.save(media);
 
-        // Update album stats
         Album album = media.getAlbum();
         album.setMediaCount(Math.max(0, album.getMediaCount() - 1));
-        album.setTotalSizeBytes(Math.max(0, album.getTotalSizeBytes() - media.getFileSizeBytes()));
+        album.setTotalSizeBytes(Math.max(0L, album.getTotalSizeBytes() - media.getFileSizeBytes()));
         albumRepository.save(album);
 
-        // Update photographer storage
         Photographer photographer = media.getPhotographer();
-        photographer.setStorageUsedBytes(Math.max(0, photographer.getStorageUsedBytes() - media.getFileSizeBytes()));
+        photographer.setStorageUsedBytes(Math.max(0L, photographer.getStorageUsedBytes() - media.getFileSizeBytes()));
         photographerRepository.save(photographer);
 
         log.info("Media deleted: {}", mediaId);
+    }
+
+    @Transactional
+    public void deleteMediaBatch(List<UUID> ids, String ownerEmail) {
+        if (ids == null || ids.isEmpty()) return;
+
+        List<Media> items = (List<Media>) mediaRepository.findAllById(ids);
+
+        // Ownership check — fail fast if any item belongs to a different photographer
+        for (Media m : items) {
+            if (!m.getPhotographer().getEmail().equals(ownerEmail)) {
+                throw new AccessDeniedException("Media " + m.getId() + " does not belong to " + ownerEmail);
+            }
+        }
+
+        Instant now = Instant.now();
+        for (Media m : items) {
+            m.setDeletedAt(now);
+        }
+        mediaRepository.saveAll(items);
+
+        // Update album stats per album (items may span albums)
+        Map<UUID, Album> albumUpdates = new HashMap<>();
+        for (Media m : items) {
+            Album album = albumUpdates.computeIfAbsent(m.getAlbum().getId(), k -> m.getAlbum());
+            album.setMediaCount(Math.max(0, album.getMediaCount() - 1));
+            album.setTotalSizeBytes(Math.max(0L, album.getTotalSizeBytes() - m.getFileSizeBytes()));
+        }
+        albumUpdates.values().forEach(albumRepository::save);
+
+        // Update photographer storage
+        long totalBytes = items.stream().mapToLong(Media::getFileSizeBytes).sum();
+        // All items validated as same owner above; pick photographer from first item
+        if (!items.isEmpty()) {
+            Photographer photographer = items.get(0).getPhotographer();
+            photographer.setStorageUsedBytes(Math.max(0L, photographer.getStorageUsedBytes() - totalBytes));
+            photographerRepository.save(photographer);
+        }
+
+        log.info("Batch deleted {} media items ({} bytes freed)", items.size(), totalBytes);
     }
 
     @Transactional

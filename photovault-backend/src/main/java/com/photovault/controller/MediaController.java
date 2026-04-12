@@ -93,9 +93,30 @@ public class MediaController {
 
     @DeleteMapping("/{mediaId}")
     @PreAuthorize("hasRole('PHOTOGRAPHER')")
-    public ResponseEntity<Void> deleteMedia(@PathVariable UUID mediaId) {
-        mediaService.deleteMedia(mediaId);
+    public ResponseEntity<Void> deleteMedia(
+            @PathVariable UUID mediaId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        mediaService.deleteMedia(mediaId, userDetails.getUsername());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * DELETE /api/v1/media/batch
+     * Body: list of media UUIDs to delete.
+     * All items must belong to the authenticated photographer.
+     */
+    @DeleteMapping("/batch")
+    @PreAuthorize("hasRole('PHOTOGRAPHER')")
+    public ResponseEntity<Map<String, Object>> deleteMediaBatch(
+            @RequestBody List<UUID> ids,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No IDs provided"));
+        }
+
+        mediaService.deleteMediaBatch(ids, userDetails.getUsername());
+        return ResponseEntity.ok(Map.of("deleted", ids.size()));
     }
 
     @PostMapping("/batch-status")

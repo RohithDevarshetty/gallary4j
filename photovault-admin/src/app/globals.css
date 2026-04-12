@@ -332,6 +332,7 @@ a { color: inherit; text-decoration: none; }
   background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5));
   opacity: 0;
   transition: opacity 0.2s;
+  pointer-events: none;
 }
 .media-thumb:hover::after { opacity: 1; }
 

@@ -7,9 +7,10 @@ import Image from 'next/image'
 interface Media {
   id: string
   filename: string
-  thumbnailUrl: string
-  previewUrl: string
+  thumbnailUrl: string | null
+  previewUrl: string | null
   originalUrl: string
+  optimizedUrl: string | null
   width: number
   height: number
   folderPath: string | null
@@ -288,12 +289,15 @@ export default function GalleryPage() {
                   onClick={() => openAt(globalIndex)}
                   style={{ position: 'relative', aspectRatio: '1', background: 'var(--card)', cursor: 'pointer', overflow: 'hidden' }}
                 >
-                  {item.thumbnailUrl && (
-                    <Image src={item.thumbnailUrl} alt={item.filename} fill sizes="(max-width: 768px) 50vw, 25vw" style={{ objectFit: 'cover', transition: 'transform 0.4s ease' }}
-                      onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-                      onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
-                    />
-                  )}
+                  <Image
+                    src={item.thumbnailUrl || item.originalUrl}
+                    alt={item.filename}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    style={{ objectFit: 'cover', transition: 'transform 0.4s ease' }}
+                    onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.04)')}
+                    onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
+                  />
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', alignItems: 'flex-end', padding: '0.75rem' }}
                     onMouseOver={e => (e.currentTarget.style.opacity = '1')}
                     onMouseOut={e => (e.currentTarget.style.opacity = '0')}
@@ -353,13 +357,15 @@ export default function GalleryPage() {
                           animationDelay: `${Math.min(globalIndex * 0.03, 0.4)}s`,
                         }}
                       >
-                        {item.thumbnailUrl && (
-                          <Image src={item.thumbnailUrl} alt={item.filename} fill sizes="(max-width: 768px) 50vw, 25vw"
-                            style={{ objectFit: 'cover', transition: 'transform 0.4s ease' }}
-                            onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.04)')}
-                            onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
-                          />
-                        )}
+                        <Image
+                          src={item.thumbnailUrl || item.originalUrl}
+                          alt={item.filename}
+                          fill
+                          sizes="(max-width: 768px) 50vw, 25vw"
+                          style={{ objectFit: 'cover', transition: 'transform 0.4s ease' }}
+                          onMouseOver={e => (e.currentTarget.style.transform = 'scale(1.04)')}
+                          onMouseOut={e => (e.currentTarget.style.transform = 'scale(1)')}
+                        />
                         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', opacity: 0, transition: 'opacity 0.2s', display: 'flex', alignItems: 'flex-end', padding: '0.75rem' }}
                           onMouseOver={e => (e.currentTarget.style.opacity = '1')}
                           onMouseOut={e => (e.currentTarget.style.opacity = '0')}
@@ -439,7 +445,7 @@ export default function GalleryPage() {
               )}
               <img
                 key={selectedMedia.id}
-                src={selectedMedia.previewUrl || selectedMedia.thumbnailUrl}
+                src={selectedMedia.previewUrl || selectedMedia.optimizedUrl || selectedMedia.thumbnailUrl || selectedMedia.originalUrl}
                 alt={selectedMedia.filename}
                 onLoad={() => setImgLoaded(true)}
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.25s ease', userSelect: 'none', WebkitUserDrag: 'none' as any }}
@@ -468,9 +474,13 @@ export default function GalleryPage() {
                   onMouseOver={e => { if (i !== selectedIndex) (e.currentTarget as HTMLElement).style.opacity = '0.8' }}
                   onMouseOut={e => { if (i !== selectedIndex) (e.currentTarget as HTMLElement).style.opacity = '0.45' }}
                 >
-                  {item.thumbnailUrl && (
-                    <Image src={item.thumbnailUrl} alt={item.filename} fill sizes="52px" style={{ objectFit: 'cover' }} />
-                  )}
+                  <Image
+                    src={item.thumbnailUrl || item.originalUrl}
+                    alt={item.filename}
+                    fill
+                    sizes="52px"
+                    style={{ objectFit: 'cover' }}
+                  />
                 </div>
               ))}
             </div>

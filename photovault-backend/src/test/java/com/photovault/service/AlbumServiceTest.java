@@ -3,8 +3,10 @@ package com.photovault.service;
 import com.photovault.dto.AlbumDTO;
 import com.photovault.dto.CreateAlbumRequest;
 import com.photovault.entity.Album;
+import com.photovault.entity.Media;
 import com.photovault.entity.Photographer;
 import com.photovault.repository.AlbumRepository;
+import com.photovault.repository.MediaRepository;
 import com.photovault.repository.PhotographerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,7 @@ class AlbumServiceTest {
 
     @Mock private AlbumRepository albumRepository;
     @Mock private PhotographerRepository photographerRepository;
+    @Mock private MediaRepository mediaRepository;
     @Mock private PasswordEncoder passwordEncoder;
 
     @InjectMocks private AlbumService albumService;
@@ -233,21 +236,33 @@ class AlbumServiceTest {
     // ── Delete ───────────────────────────────────────────────────────────────
 
     @Test
-    void deleteAlbum_existingAlbum_softDeletes() {
+    void deleteAlbum_ownerEmail_softDeletes() {
         photographer.setAlbumsCount(3);
         when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+        when(mediaRepository.findAllByAlbumId(album.getId())).thenReturn(List.of());
 
-        albumService.deleteAlbum(album.getId());
+        albumService.deleteAlbum(album.getId(), photographer.getEmail());
 
         verify(albumRepository).save(argThat(a -> a.getDeletedAt() != null));
+    }
+
+    @Test
+    void deleteAlbum_nonOwnerEmail_throwsAccessDeniedException() {
+        when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+            () -> albumService.deleteAlbum(album.getId(), "other@studio.com"));
+
+        verify(albumRepository, never()).save(any());
     }
 
     @Test
     void deleteAlbum_decrementsPhotographerAlbumCount() {
         photographer.setAlbumsCount(3);
         when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+        when(mediaRepository.findAllByAlbumId(album.getId())).thenReturn(List.of());
 
-        albumService.deleteAlbum(album.getId());
+        albumService.deleteAlbum(album.getId(), photographer.getEmail());
 
         verify(photographerRepository).save(argThat(p -> p.getAlbumsCount() == 2));
     }
@@ -256,8 +271,9 @@ class AlbumServiceTest {
     void deleteAlbum_countAtZero_clampsToZeroNotNegative() {
         photographer.setAlbumsCount(0);
         when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+        when(mediaRepository.findAllByAlbumId(album.getId())).thenReturn(List.of());
 
-        albumService.deleteAlbum(album.getId());
+        albumService.deleteAlbum(album.getId(), photographer.getEmail());
 
         verify(photographerRepository).save(argThat(p -> p.getAlbumsCount() == 0));
     }
@@ -267,8 +283,57 @@ class AlbumServiceTest {
         UUID unknown = UUID.randomUUID();
         when(albumRepository.findById(unknown)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> albumService.deleteAlbum(unknown));
+        assertThrows(RuntimeException.class,
+            () -> albumService.deleteAlbum(unknown, photographer.getEmail()));
         verify(albumRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteAlbum_cascadesMediaSoftDelete() {
+        photographer.setAlbumsCount(1);
+        Media m1 = Media.builder().id(UUID.randomUUID()).album(album)
+            .photographer(photographer).fileSizeBytes(1000L).build();
+        Media m2 = Media.builder().id(UUID.randomUUID()).album(album)
+            .photographer(photographer).fileSizeBytes(2000L).build();
+        when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+        when(mediaRepository.findAllByAlbumId(album.getId())).thenReturn(List.of(m1, m2));
+
+        albumService.deleteAlbum(album.getId(), photographer.getEmail());
+
+        verify(mediaRepository).saveAll(argThat(media -> {
+            List<Media> list = (List<Media>) media;
+            return list.size() == 2 && list.stream().allMatch(m -> m.getDeletedAt() != null);
+        }));
+    }
+
+    @Test
+    void deleteAlbum_reclaimsAllMediaStorageBytesFromPhotographer() {
+        photographer.setAlbumsCount(2);
+        photographer.setStorageUsedBytes(10_000L);
+        album.setTotalSizeBytes(3000L);
+        Media m1 = Media.builder().id(UUID.randomUUID()).album(album)
+            .photographer(photographer).fileSizeBytes(1000L).build();
+        Media m2 = Media.builder().id(UUID.randomUUID()).album(album)
+            .photographer(photographer).fileSizeBytes(2000L).build();
+        when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+        when(mediaRepository.findAllByAlbumId(album.getId())).thenReturn(List.of(m1, m2));
+
+        albumService.deleteAlbum(album.getId(), photographer.getEmail());
+
+        // 10000 - (1000 + 2000) = 7000
+        verify(photographerRepository).save(argThat(p -> p.getStorageUsedBytes() == 7_000L));
+    }
+
+    @Test
+    void deleteAlbum_noMediaInAlbum_storageUnchanged() {
+        photographer.setAlbumsCount(1);
+        photographer.setStorageUsedBytes(5_000L);
+        when(albumRepository.findById(album.getId())).thenReturn(Optional.of(album));
+        when(mediaRepository.findAllByAlbumId(album.getId())).thenReturn(List.of());
+
+        albumService.deleteAlbum(album.getId(), photographer.getEmail());
+
+        verify(photographerRepository).save(argThat(p -> p.getStorageUsedBytes() == 5_000L));
     }
 
     // ── View count ───────────────────────────────────────────────────────────

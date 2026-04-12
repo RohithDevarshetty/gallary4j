@@ -3,8 +3,10 @@ package com.photovault.service;
 import com.photovault.dto.AlbumDTO;
 import com.photovault.dto.CreateAlbumRequest;
 import com.photovault.entity.Album;
+import com.photovault.entity.Media;
 import com.photovault.entity.Photographer;
 import com.photovault.repository.AlbumRepository;
+import com.photovault.repository.MediaRepository;
 import com.photovault.repository.PhotographerRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,11 +14,13 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -26,6 +30,7 @@ public class AlbumService {
 
     private final AlbumRepository albumRepository;
     private final PhotographerRepository photographerRepository;
+    private final MediaRepository mediaRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -124,19 +129,38 @@ public class AlbumService {
 
     @Transactional
     @CacheEvict(value = "albums", key = "#albumId")
-    public void deleteAlbum(UUID albumId) {
+    public void deleteAlbum(UUID albumId, String ownerEmail) {
         Album album = albumRepository.findById(albumId)
             .orElseThrow(() -> new RuntimeException("Album not found"));
 
-        album.setDeletedAt(Instant.now());
+        if (!album.getPhotographer().getEmail().equals(ownerEmail)) {
+            throw new AccessDeniedException("You do not own this album");
+        }
+
+        Instant now = Instant.now();
+
+        // Cascade soft-delete to all media in this album
+        List<Media> albumMedia = mediaRepository.findAllByAlbumId(albumId);
+        long reclaimedBytes = 0L;
+        for (Media m : albumMedia) {
+            m.setDeletedAt(now);
+            reclaimedBytes += m.getFileSizeBytes();
+        }
+        if (!albumMedia.isEmpty()) {
+            mediaRepository.saveAll(albumMedia);
+        }
+
+        // Soft-delete the album itself
+        album.setDeletedAt(now);
         albumRepository.save(album);
 
-        // Update photographer album count
+        // Update photographer stats
         Photographer photographer = album.getPhotographer();
         photographer.setAlbumsCount(Math.max(0, photographer.getAlbumsCount() - 1));
+        photographer.setStorageUsedBytes(Math.max(0L, photographer.getStorageUsedBytes() - reclaimedBytes));
         photographerRepository.save(photographer);
 
-        log.info("Album deleted: {}", albumId);
+        log.info("Album deleted: {} ({} media, {} bytes reclaimed)", albumId, albumMedia.size(), reclaimedBytes);
     }
 
     @Transactional
