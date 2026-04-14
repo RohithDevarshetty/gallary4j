@@ -47,6 +47,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/gallery/**").permitAll()
                 // Public read-only access for client gallery
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/albums/slug/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/albums/slug/*/verify").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/media/album/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/media/*/download").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/media/album/*/zip").permitAll()

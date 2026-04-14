@@ -112,19 +112,36 @@ public class AlbumService {
             .orElseThrow(() -> new RuntimeException("Album not found"));
 
         album.setTitle(request.getTitle());
-        album.setDescription(request.getDescription());
-        album.setEventDate(request.getEventDate());
-        album.setClientName(request.getClientName());
-        album.setClientEmail(request.getClientEmail());
-        album.setClientPhone(request.getClientPhone());
+        if (request.getDescription() != null) album.setDescription(request.getDescription());
+        if (request.getEventDate() != null) album.setEventDate(request.getEventDate());
+        if (request.getClientName() != null) album.setClientName(request.getClientName());
+        if (request.getClientEmail() != null) album.setClientEmail(request.getClientEmail());
+        if (request.getClientPhone() != null) album.setClientPhone(request.getClientPhone());
 
         if (request.getPassword() != null && !request.getPassword().isEmpty()) {
             album.setRequiresPassword(true);
             album.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        } else if (Boolean.FALSE.equals(request.getRequiresPassword())) {
+            album.setRequiresPassword(false);
+            album.setPasswordHash(null);
+        }
+
+        if (request.getAllowDownloads() != null) {
+            album.setAllowDownloads(request.getAllowDownloads());
         }
 
         album = albumRepository.save(album);
         return toDTO(album);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean verifyAlbumPassword(String slug, String rawPassword) {
+        Album album = albumRepository.findActiveBySlug(slug)
+            .orElseThrow(() -> new RuntimeException("Album not found"));
+        if (!Boolean.TRUE.equals(album.getRequiresPassword()) || album.getPasswordHash() == null) {
+            return true;
+        }
+        return passwordEncoder.matches(rawPassword, album.getPasswordHash());
     }
 
     @Transactional

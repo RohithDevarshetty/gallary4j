@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import BrickLogo from '../components/BrickLogo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -40,12 +41,12 @@ export default function LoginPage() {
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: '3rem',
-        background: 'linear-gradient(160deg, #0d0d0d 0%, #111008 100%)',
-        borderRight: '1px solid var(--border)',
+        background: 'linear-gradient(160deg, #060708 0%, #0a0c10 100%)',
+        borderRight: '1px solid rgba(255,255,255,0.07)',
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Decorative circle */}
+        {/* Decorative circles */}
         <div style={{
           position: 'absolute',
           top: '-180px',
@@ -53,7 +54,7 @@ export default function LoginPage() {
           width: '520px',
           height: '520px',
           borderRadius: '50%',
-          border: '1px solid rgba(200,169,106,0.08)',
+          border: '1px solid rgba(200,169,106,0.06)',
           pointerEvents: 'none',
         }} />
         <div style={{
@@ -63,7 +64,7 @@ export default function LoginPage() {
           width: '360px',
           height: '360px',
           borderRadius: '50%',
-          border: '1px solid rgba(200,169,106,0.06)',
+          border: '1px solid rgba(200,169,106,0.04)',
           pointerEvents: 'none',
         }} />
         {/* Accent line */}
@@ -78,15 +79,21 @@ export default function LoginPage() {
 
         {/* Brand */}
         <div className="anim-in">
-          <div style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: '1.4rem',
-            fontStyle: 'italic',
-            fontWeight: 400,
-            color: 'var(--text)',
-            letterSpacing: '0.02em',
-          }}>
-            Photo<span style={{ color: 'var(--accent)' }}>Vault</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <BrickLogo size={28} />
+            <span style={{
+              fontFamily: 'var(--font-brand)',
+              fontWeight: 800,
+              fontSize: '1.3rem',
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, var(--accent) 100%)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              Brick
+            </span>
           </div>
         </div>
 
@@ -100,9 +107,10 @@ export default function LoginPage() {
           }}>
             <span style={{ width: '24px', height: '1px', background: 'var(--accent)' }} />
             <span style={{
-              fontSize: '0.6875rem',
-              fontWeight: 500,
-              letterSpacing: '0.14em',
+              fontFamily: 'var(--font-brand)',
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              letterSpacing: '0.22em',
               textTransform: 'uppercase',
               color: 'var(--accent)',
             }}>
@@ -111,16 +119,34 @@ export default function LoginPage() {
           </div>
 
           <h1 className="anim-up d-2" style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-            fontWeight: 300,
-            lineHeight: 1.1,
-            color: 'var(--text)',
-            letterSpacing: '-0.01em',
+            fontFamily: 'var(--font-brand)',
+            fontSize: 'clamp(3rem, 6vw, 5rem)',
+            fontWeight: 800,
+            lineHeight: 1.0,
+            letterSpacing: '-0.02em',
             marginBottom: '1.5rem',
           }}>
-            Your gallery,<br />
-            <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>your vision.</em>
+            <span style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 40%, var(--accent) 100%)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              display: 'block',
+            }}>
+              Build your<br />world,
+            </span>
+            <span style={{
+              background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent-hi) 60%, rgba(255,230,160,0.9) 100%)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              display: 'block',
+              fontSize: '0.85em',
+              letterSpacing: '0.06em',
+              fontStyle: 'normal',
+            }}>
+              glass by glass.
+            </span>
           </h1>
 
           <p className="anim-up d-3" style={{
@@ -129,8 +155,8 @@ export default function LoginPage() {
             lineHeight: 1.7,
             maxWidth: '380px',
           }}>
-            Deliver stunning galleries to your clients. Enterprise-grade platform
-            built for photographers who demand more.
+            Deliver stunning galleries to your clients.
+            Every session, beautifully framed.
           </p>
         </div>
 
@@ -155,7 +181,9 @@ export default function LoginPage() {
         flexDirection: 'column',
         justifyContent: 'center',
         padding: '3rem 4rem',
-        background: 'var(--surface)',
+        background: 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+        backdropFilter: 'blur(32px)',
+        WebkitBackdropFilter: 'blur(32px)',
       }}>
         <div style={{ maxWidth: '360px', width: '100%' }}>
           <div className="anim-up">

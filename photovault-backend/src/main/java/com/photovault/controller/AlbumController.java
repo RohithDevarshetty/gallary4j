@@ -16,6 +16,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -70,6 +71,20 @@ public class AlbumController {
 
         AlbumDTO album = albumService.updateAlbum(albumId, request);
         return ResponseEntity.ok(album);
+    }
+
+    @PostMapping("/slug/{slug}/verify")
+    public ResponseEntity<Map<String, Object>> verifyAlbumPassword(
+            @PathVariable String slug,
+            @RequestBody Map<String, String> body) {
+
+        String password = body.getOrDefault("password", "");
+        boolean verified = albumService.verifyAlbumPassword(slug, password);
+        if (verified) {
+            return ResponseEntity.ok(Map.of("verified", true));
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Incorrect password"));
+        }
     }
 
     @DeleteMapping("/{albumId}")

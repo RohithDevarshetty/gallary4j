@@ -24,6 +24,7 @@ public class CreateAlbumRequest {
     private String clientEmail;
     private String clientPhone;
     private String password;
+    private Boolean requiresPassword;
     private Boolean allowDownloads;
     private Boolean allowSharing;
     private Boolean enableSelection;

@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Image from 'next/image'
+import AdminShell from '../../../components/AdminShell'
 
 interface Media {
   id: string
@@ -87,6 +88,12 @@ export default function AlbumDetailPage() {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  // Settings modal
+  const [showSettings, setShowSettings] = useState(false)
+  const [settingsPassword, setSettingsPassword] = useState('')
+  const [settingsAllowDownloads, setSettingsAllowDownloads] = useState(true)
+  const [savingSettings, setSavingSettings] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -265,17 +272,68 @@ export default function AlbumDetailPage() {
     setSelected(new Set())
   }
 
+  const openSettings = () => {
+    setSettingsPassword('')
+    setSettingsAllowDownloads(album?.allowDownloads ?? true)
+    setShowSettings(true)
+  }
+
+  const saveSettings = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    setSavingSettings(true)
+    try {
+      const body: Record<string, unknown> = {
+        title: album.title,
+        allowDownloads: settingsAllowDownloads,
+      }
+      if (settingsPassword.trim()) {
+        body.password = settingsPassword.trim()
+        body.requiresPassword = true
+      } else if (album.requiresPassword && !settingsPassword) {
+        // no new password entered and field is blank — keep existing password unchanged
+      }
+      const res = await fetch(`http://localhost:8080/api/v1/albums/${albumId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        await fetchAlbum(token)
+        setShowSettings(false)
+      }
+    } catch (e) { console.error('Save settings error:', e) }
+    finally { setSavingSettings(false) }
+  }
+
+  const clearPassword = async () => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    setSavingSettings(true)
+    try {
+      await fetch(`http://localhost:8080/api/v1/albums/${albumId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: album.title, requiresPassword: false, allowDownloads: settingsAllowDownloads }),
+      })
+      await fetchAlbum(token)
+      setShowSettings(false)
+    } catch (e) { console.error('Clear password error:', e) }
+    finally { setSavingSettings(false) }
+  }
+
   if (loading) {
     return (
-      <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-        <nav className="nav"><div className="nav-inner"><span className="nav-brand">Photo<span>Vault</span></span></div></nav>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-            <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-hi)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 1rem' }} />
-            Loading gallery…
+      <AdminShell>
+        <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ width: '32px', height: '32px', border: '1px solid var(--border-hi)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 1rem' }} />
+              Loading gallery…
+            </div>
           </div>
         </div>
-      </div>
+      </AdminShell>
     )
   }
 
@@ -288,6 +346,7 @@ export default function AlbumDetailPage() {
   })
 
   return (
+    <AdminShell>
     <div style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
 
       {/* Folder modal */}
@@ -341,6 +400,81 @@ export default function AlbumDetailPage() {
         </div>
       )}
 
+      {/* Settings modal */}
+      {showSettings && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            style={{ background: 'var(--card)', border: '1px solid var(--border-hi)', borderRadius: 'var(--radius)', padding: '2rem', width: '420px', maxWidth: '90vw' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', fontWeight: 300, marginBottom: '0.375rem' }}>
+              Album settings
+            </h3>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1.75rem' }}>
+              Control access and download permissions for this gallery.
+            </p>
+
+            {/* Password field */}
+            <div className="field" style={{ marginBottom: '1.25rem' }}>
+              <label className="label">
+                Access password
+                {album?.requiresPassword && (
+                  <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 500 }}>● Protected</span>
+                )}
+              </label>
+              <input
+                className="input"
+                type="password"
+                placeholder={album?.requiresPassword ? 'Enter new password to change' : 'Set access password'}
+                value={settingsPassword}
+                onChange={e => setSettingsPassword(e.target.value)}
+              />
+              {album?.requiresPassword && (
+                <button
+                  onClick={clearPassword}
+                  disabled={savingSettings}
+                  style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)', textDecoration: 'underline', opacity: savingSettings ? 0.5 : 1 }}
+                >
+                  Clear password (make public)
+                </button>
+              )}
+            </div>
+
+            {/* Allow downloads toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', padding: '0.875rem 1rem', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text)', marginBottom: '0.125rem' }}>Allow downloads</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Clients can download original photos</div>
+              </div>
+              <button
+                onClick={() => setSettingsAllowDownloads(v => !v)}
+                style={{
+                  width: '40px', height: '22px', borderRadius: '11px', border: 'none', cursor: 'pointer',
+                  background: settingsAllowDownloads ? 'var(--accent)' : 'var(--border-hi)',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: '3px', left: settingsAllowDownloads ? '21px' : '3px',
+                  width: '16px', height: '16px', borderRadius: '50%', background: '#fff',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button className="btn-ghost" onClick={() => setShowSettings(false)} disabled={savingSettings}>Cancel</button>
+              <button className="btn-accent-outline" onClick={saveSettings} disabled={savingSettings}>
+                {savingSettings ? 'Saving…' : 'Save settings'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="nav">
         <div className="nav-inner">
@@ -349,9 +483,25 @@ export default function AlbumDetailPage() {
               ← Back
             </button>
             <span style={{ color: 'var(--border-hi)' }}>|</span>
-            <span className="nav-brand">Photo<span>Vault</span></span>
+            <span style={{
+              fontFamily: 'var(--font-brand)',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              letterSpacing: '0.2em',
+              textTransform: 'uppercase',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, var(--accent) 100%)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>Brick</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button className="btn-ghost" onClick={openSettings} style={{ position: 'relative' }}>
+              Settings
+              {album?.requiresPassword && (
+                <span title="Password protected" style={{ marginLeft: '0.3rem', fontSize: '0.7rem' }}>🔒</span>
+              )}
+            </button>
             {album?.slug ? (
               <a href={`http://localhost:3001/gallery/${album.slug}`} target="_blank" rel="noopener noreferrer" className="btn-ghost">
                 Preview ↗
@@ -787,5 +937,6 @@ export default function AlbumDetailPage() {
         .media-thumb:hover .delete-overlay { background: rgba(0,0,0,0.2) !important; }
       `}</style>
     </div>
+    </AdminShell>
   )
 }

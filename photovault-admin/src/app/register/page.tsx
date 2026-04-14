@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import BrickLogo from '../../components/BrickLogo'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -43,7 +44,7 @@ export default function RegisterPage() {
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: '3rem',
-        background: '#0d0d0d',
+        background: 'linear-gradient(160deg, var(--bg) 0%, #0c0e0a 100%)',
         borderRight: '1px solid var(--border)',
         position: 'relative',
         overflow: 'hidden',
@@ -56,7 +57,7 @@ export default function RegisterPage() {
           width: '480px',
           height: '480px',
           borderRadius: '50%',
-          border: '1px solid rgba(200,169,106,0.07)',
+          border: '1px solid rgba(200,169,106,0.06)',
           pointerEvents: 'none',
         }} />
         <div style={{
@@ -66,22 +67,57 @@ export default function RegisterPage() {
           width: '320px',
           height: '320px',
           borderRadius: '50%',
-          border: '1px solid rgba(200,169,106,0.05)',
+          border: '1px solid rgba(200,169,106,0.04)',
           pointerEvents: 'none',
         }} />
+        {/* Accent line */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: '3rem',
+          right: '3rem',
+          height: '1px',
+          background: 'linear-gradient(to right, var(--accent-dim), transparent)',
+        }} />
 
-        <div className="anim-in" style={{
-          fontFamily: 'var(--font-serif)',
-          fontSize: '1.4rem',
-          fontStyle: 'italic',
-          fontWeight: 400,
-          color: 'var(--text)',
-        }}>
-          Photo<span style={{ color: 'var(--accent)' }}>Vault</span>
+        <div className="anim-in">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <BrickLogo size={26} />
+            <span style={{
+              fontFamily: 'var(--font-brand)',
+              fontWeight: 800,
+              fontSize: '1.2rem',
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, var(--accent) 100%)',
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              Brick
+            </span>
+          </div>
         </div>
 
         <div>
-          <h2 className="anim-up" style={{
+          <div className="anim-up d-1" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '2rem',
+          }}>
+            <span style={{ width: '24px', height: '1px', background: 'var(--accent)' }} />
+            <span style={{
+              fontSize: '0.6875rem',
+              fontWeight: 500,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              color: 'var(--accent)',
+            }}>
+              Free Trial
+            </span>
+          </div>
+          <h2 className="anim-up d-2" style={{
             fontFamily: 'var(--font-serif)',
             fontSize: 'clamp(2rem, 4vw, 3.25rem)',
             fontWeight: 300,
@@ -93,7 +129,7 @@ export default function RegisterPage() {
             <em style={{ color: 'var(--accent)', fontStyle: 'italic' }}>serious</em><br />
             photographers.
           </h2>
-          <p className="anim-up d-1" style={{
+          <p className="anim-up d-3" style={{
             fontSize: '0.9rem',
             color: 'var(--text-muted)',
             lineHeight: 1.7,
@@ -104,7 +140,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Plan features */}
-        <div className="anim-up d-2" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div className="anim-up d-4" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {[
             'Unlimited photo galleries',
             'Client delivery & favorites',

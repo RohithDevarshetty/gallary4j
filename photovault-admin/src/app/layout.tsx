@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PhotoVault — Studio Admin',
-  description: 'Enterprise photo gallery platform for photographers',
+  title: 'Brick — Studio',
+  description: 'Professional photo gallery platform for photographers',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
