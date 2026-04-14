@@ -1,0 +1,22 @@
+# Replace api.example.com with your real API hostname.
+# Caddy automatically provisions and renews a Let's Encrypt cert.
+{$API_DOMAIN:api.example.com} {
+    encode zstd gzip
+
+    # Bucket4j in the app handles auth-endpoint rate limiting; this is a safety net.
+    @auth path /api/auth/*
+    rate_limit @auth 30r/m
+
+    reverse_proxy backend:8080 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
